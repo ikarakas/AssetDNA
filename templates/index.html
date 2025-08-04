@@ -374,6 +374,24 @@
             margin-left: 8px;
         }
         
+        .timestamp-badge {
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+            margin-left: 4px;
+        }
+        
+        .timestamp-section {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
         .environment-badge {
             background: #48bb78;
             color: white;
@@ -936,6 +954,43 @@
             };
         }
         
+        // Utility function to format timestamps
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return 'N/A';
+            
+            try {
+                const date = new Date(timestamp);
+                if (isNaN(date.getTime())) return 'Invalid Date';
+                
+                const now = new Date();
+                const diffMs = now - date;
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMinutes = Math.floor(diffMs / (1000 * 60));
+                
+                let timeAgo = '';
+                if (diffDays > 0) {
+                    timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                } else if (diffHours > 0) {
+                    timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                } else if (diffMinutes > 0) {
+                    timeAgo = `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+                } else {
+                    timeAgo = 'Just now';
+                }
+                
+                // Get timezone abbreviation
+                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const timezoneAbbr = new Intl.DateTimeFormat('en', {
+                    timeZoneName: 'short'
+                }).formatToParts(date).find(part => part.type === 'timeZoneName')?.value || '';
+                
+                return `${date.toLocaleDateString()} ${date.toLocaleTimeString()} ${timezoneAbbr} (${timeAgo})`;
+            } catch (error) {
+                return 'Invalid Date';
+            }
+        }
+        
         // Initialize application
         document.addEventListener('DOMContentLoaded', function() {
             loadTopology();
@@ -1229,7 +1284,14 @@
         }
         
         function renderEnvironments(environments) {
-            return Object.entries(environments).map(([env, cisGroups]) => {
+            // Sort environments to put UNASSIGNED at the bottom
+            const sortedEnvironments = Object.entries(environments).sort(([envA], [envB]) => {
+                if (envA === 'UNASSIGNED') return 1;  // UNASSIGNED goes to the bottom
+                if (envB === 'UNASSIGNED') return -1; // UNASSIGNED goes to the bottom
+                return envA.localeCompare(envB); // Normal alphabetical sorting for others
+            });
+            
+            return sortedEnvironments.map(([env, cisGroups]) => {
                 const envAssetCount = Object.values(cisGroups).flat().length;
                 const envIcon = getEnvironmentIcon(env);
                 
@@ -1254,7 +1316,14 @@
         }
         
         function renderCisGroups(cisGroups, environment) {
-            return Object.entries(cisGroups).map(([cis, assets]) => `
+            // Sort CIS groups to put OTHER at the bottom
+            const sortedCisGroups = Object.entries(cisGroups).sort(([cisA], [cisB]) => {
+                if (cisA === 'OTHER') return 1;  // OTHER goes to the bottom
+                if (cisB === 'OTHER') return -1; // OTHER goes to the bottom
+                return cisA.localeCompare(cisB); // Normal alphabetical sorting for others
+            });
+            
+            return sortedCisGroups.map(([cis, assets]) => `
                 <li class="tree-item">
                     <div class="tree-label cis" onclick="toggleNode(this)"
                          data-environment="${environment}" data-cis-group="${cis}"
@@ -1485,6 +1554,12 @@
                         ${asset.os ? `<strong>OS:</strong> ${asset.os}<br>` : ''}
                         ${asset.description ? `<strong>Description:</strong> ${asset.description}<br>` : ''}
                     </div>
+                    <div class="timestamp-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fas fa-calendar-plus"></i> <strong>Created:</strong> ${formatTimestamp(asset.createdAt)}</span>
+                            <span><i class="fas fa-calendar-check"></i> <strong>Updated:</strong> ${formatTimestamp(asset.updatedAt)}</span>
+                        </div>
+                    </div>
                 </div>
             `).join('');
             
@@ -1537,6 +1612,12 @@
                                 ${asset.ipAddress ? `<strong>IP:</strong> ${asset.ipAddress}<br>` : ''}
                                 ${asset.os ? `<strong>OS:</strong> ${asset.os}<br>` : ''}
                                 ${asset.description ? `<strong>Description:</strong> ${asset.description}<br>` : ''}
+                            </div>
+                            <div class="timestamp-section">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span><i class="fas fa-calendar-plus"></i> <strong>Created:</strong> ${formatTimestamp(asset.createdAt)}</span>
+                                    <span><i class="fas fa-calendar-check"></i> <strong>Updated:</strong> ${formatTimestamp(asset.updatedAt)}</span>
+                                </div>
                             </div>
                         </div>
                     `).join('');
@@ -1662,19 +1743,26 @@
                 (env.description && env.description.toLowerCase().includes(searchTerm))
             );
             
+            // Sort environments to put UNASSIGNED at the bottom
+            const sortedEnvironments = filteredEnvironments.sort((envA, envB) => {
+                if (envA.name === 'UNASSIGNED') return 1;  // UNASSIGNED goes to the bottom
+                if (envB.name === 'UNASSIGNED') return -1; // UNASSIGNED goes to the bottom
+                return envA.name.localeCompare(envB.name); // Normal alphabetical sorting for others
+            });
+            
             // Update count
             if (countElement) {
-                countElement.textContent = filteredEnvironments.length;
+                countElement.textContent = sortedEnvironments.length;
             }
             
-            if (filteredEnvironments.length === 0) {
+            if (sortedEnvironments.length === 0) {
                 container.innerHTML = searchTerm ? 
                     '<div class="loading">No environments match your search</div>' :
                     '<div class="loading">No environments found</div>';
                 return;
             }
             
-            const html = filteredEnvironments.map(env => `
+            const html = sortedEnvironments.map(env => `
                 <div class="asset-card" style="margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
@@ -1713,19 +1801,26 @@
                 (group.description && group.description.toLowerCase().includes(searchTerm))
             );
             
+            // Sort CIS groups to put OTHER at the bottom
+            const sortedCisGroups = filteredCisGroups.sort((groupA, groupB) => {
+                if (groupA.name === 'OTHER') return 1;  // OTHER goes to the bottom
+                if (groupB.name === 'OTHER') return -1; // OTHER goes to the bottom
+                return groupA.name.localeCompare(groupB.name); // Normal alphabetical sorting for others
+            });
+            
             // Update count
             if (countElement) {
-                countElement.textContent = filteredCisGroups.length;
+                countElement.textContent = sortedCisGroups.length;
             }
             
-            if (filteredCisGroups.length === 0) {
+            if (sortedCisGroups.length === 0) {
                 container.innerHTML = searchTerm ? 
                     '<div class="loading">No CIS groups match your search</div>' :
                     '<div class="loading">No CIS groups found</div>';
                 return;
             }
             
-            const html = filteredCisGroups.map(group => `
+            const html = sortedCisGroups.map(group => `
                 <div class="asset-card" style="margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
