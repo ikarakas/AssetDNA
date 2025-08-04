@@ -886,13 +886,22 @@
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    // Try to get error message from response
+                    let errorMessage = `HTTP error! status: ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.error) {
+                            errorMessage = errorData.error;
+                        }
+                    } catch (e) {
+                        // If we can't parse JSON, use default message
+                    }
+                    throw new Error(errorMessage);
                 }
                 
                 return await response.json();
             } catch (error) {
                 console.error('API call failed:', error);
-                showNotification('API call failed: ' + error.message, 'error');
                 throw error;
             }
         }
@@ -1639,7 +1648,12 @@
                 showNotification('Environment deleted successfully!');
                 loadEnvironments();
             } catch (error) {
-                showNotification('Failed to delete environment', 'error');
+                // Extract error message from response if available
+                let errorMessage = 'Failed to delete environment';
+                if (error.message && error.message.includes('Cannot delete environment')) {
+                    errorMessage = error.message;
+                }
+                showNotification(errorMessage, 'error');
             }
         }
         
@@ -1656,7 +1670,12 @@
                 showNotification('CIS Group deleted successfully!');
                 loadCisGroups();
             } catch (error) {
-                showNotification('Failed to delete CIS group', 'error');
+                // Extract error message from response if available
+                let errorMessage = 'Failed to delete CIS group';
+                if (error.message && error.message.includes('Cannot delete CIS group')) {
+                    errorMessage = error.message;
+                }
+                showNotification(errorMessage, 'error');
             }
         }
         
