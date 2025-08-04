@@ -311,15 +311,29 @@ def move_asset():
 def get_topology():
     assets = Asset.query.all()
     
+    # Get all environments and CIS groups from database
+    environments = Environment.query.all()
+    cis_groups = CisGroup.query.all()
+    
     # Get all unique categories from environments
     categories = db.session.query(Environment.category).distinct().all()
     category_list = [cat[0] for cat in categories]
     
-    # Initialize topology with dynamic categories
+    # Initialize topology with all environments and CIS groups
     topology = {}
     for category in category_list:
         topology[category] = {}
+        
+        # Add all environments in this category
+        for env in environments:
+            if env.category == category:
+                topology[category][env.name] = {}
+                
+                # Add all CIS groups to each environment
+                for cis_group in cis_groups:
+                    topology[category][env.name][cis_group.name] = []
     
+    # Now add assets to their respective locations
     for asset in assets:
         category = get_environment_category(asset.environment)
         
