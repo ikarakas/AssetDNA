@@ -672,9 +672,14 @@
                         <!-- Environments Management -->
                         <div>
                             <h4 style="margin-bottom: 15px; color: #2d3748;">
-                                <i class="fas fa-globe"></i> Environments
+                                <i class="fas fa-globe"></i> Environments (<span id="environmentCount">0</span>)
                             </h4>
-                            <div style="margin-bottom: 15px;">
+                            <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                                <div style="flex: 1; position: relative;">
+                                    <input type="text" id="environmentSearch" placeholder="Search environments..." 
+                                           style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                                    <i class="fas fa-search" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #6b7280;"></i>
+                                </div>
                                 <button onclick="showAddEnvironmentModal()" class="btn btn-success btn-small">
                                     <i class="fas fa-plus"></i> Add Environment
                                 </button>
@@ -687,9 +692,14 @@
                         <!-- CIS Groups Management -->
                         <div>
                             <h4 style="margin-bottom: 15px; color: #2d3748;">
-                                <i class="fas fa-folder"></i> CIS Groups
+                                <i class="fas fa-folder"></i> CIS Groups (<span id="cisGroupCount">0</span>)
                             </h4>
-                            <div style="margin-bottom: 15px;">
+                            <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                                <div style="flex: 1; position: relative;">
+                                    <input type="text" id="cisGroupSearch" placeholder="Search CIS groups..." 
+                                           style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                                    <i class="fas fa-search" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #6b7280;"></i>
+                                </div>
                                 <button onclick="showAddCisGroupModal()" class="btn btn-success btn-small">
                                     <i class="fas fa-plus"></i> Add CIS Group
                                 </button>
@@ -913,6 +923,19 @@
         let cisGroups = [];
         let assetTypes = [];
         
+        // Utility function for debouncing
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
         // Initialize application
         document.addEventListener('DOMContentLoaded', function() {
             loadTopology();
@@ -933,6 +956,10 @@
             document.getElementById('addCisGroupForm').addEventListener('submit', handleAddCisGroup);
             document.getElementById('editCisGroupForm').addEventListener('submit', handleEditCisGroup);
             document.getElementById('editMode').addEventListener('click', toggleEditMode);
+            
+            // Search functionality
+            document.getElementById('environmentSearch')?.addEventListener('input', debounce(renderEnvironmentsList, 300));
+            document.getElementById('cisGroupSearch')?.addEventListener('input', debounce(renderCisGroupsList, 300));
             document.getElementById('searchAssets').addEventListener('input', handleAssetSearch);
             document.getElementById('filterEnvironment').addEventListener('change', handleAdvancedSearch);
             document.getElementById('filterCisGroup').addEventListener('change', handleAdvancedSearch);
@@ -1622,14 +1649,32 @@
         
         function renderEnvironmentsList() {
             const container = document.getElementById('environmentsList');
+            const countElement = document.getElementById('environmentCount');
             if (!container) return;
             
-            if (environments.length === 0) {
-                container.innerHTML = '<div class="loading">No environments found</div>';
+            // Get search term
+            const searchTerm = document.getElementById('environmentSearch')?.value?.toLowerCase() || '';
+            
+            // Filter environments based on search term
+            const filteredEnvironments = environments.filter(env => 
+                env.name.toLowerCase().includes(searchTerm) ||
+                env.category.toLowerCase().includes(searchTerm) ||
+                (env.description && env.description.toLowerCase().includes(searchTerm))
+            );
+            
+            // Update count
+            if (countElement) {
+                countElement.textContent = filteredEnvironments.length;
+            }
+            
+            if (filteredEnvironments.length === 0) {
+                container.innerHTML = searchTerm ? 
+                    '<div class="loading">No environments match your search</div>' :
+                    '<div class="loading">No environments found</div>';
                 return;
             }
             
-            const html = environments.map(env => `
+            const html = filteredEnvironments.map(env => `
                 <div class="asset-card" style="margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
@@ -1656,14 +1701,31 @@
         
         function renderCisGroupsList() {
             const container = document.getElementById('cisGroupsList');
+            const countElement = document.getElementById('cisGroupCount');
             if (!container) return;
             
-            if (cisGroups.length === 0) {
-                container.innerHTML = '<div class="loading">No CIS groups found</div>';
+            // Get search term
+            const searchTerm = document.getElementById('cisGroupSearch')?.value?.toLowerCase() || '';
+            
+            // Filter CIS groups based on search term
+            const filteredCisGroups = cisGroups.filter(group => 
+                group.name.toLowerCase().includes(searchTerm) ||
+                (group.description && group.description.toLowerCase().includes(searchTerm))
+            );
+            
+            // Update count
+            if (countElement) {
+                countElement.textContent = filteredCisGroups.length;
+            }
+            
+            if (filteredCisGroups.length === 0) {
+                container.innerHTML = searchTerm ? 
+                    '<div class="loading">No CIS groups match your search</div>' :
+                    '<div class="loading">No CIS groups found</div>';
                 return;
             }
             
-            const html = cisGroups.map(group => `
+            const html = filteredCisGroups.map(group => `
                 <div class="asset-card" style="margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
