@@ -877,6 +877,7 @@
         // API calls
         async function apiCall(url, options = {}) {
             try {
+                console.log('Making API call to:', url, 'with options:', options);
                 const response = await fetch(url, {
                     headers: {
                         'Content-Type': 'application/json',
@@ -885,11 +886,15 @@
                     ...options
                 });
                 
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+                
                 if (!response.ok) {
                     // Try to get error message from response
                     let errorMessage = `HTTP error! status: ${response.status}`;
                     try {
                         const errorData = await response.json();
+                        console.log('Error data:', errorData);
                         if (errorData.error) {
                             errorMessage = errorData.error;
                         }
@@ -897,12 +902,15 @@
                         // If we can't parse JSON, use default message
                         console.error('Failed to parse error response:', e);
                     }
+                    console.log('Throwing error with message:', errorMessage);
                     const error = new Error(errorMessage);
                     error.status = response.status;
                     throw error;
                 }
                 
-                return await response.json();
+                const result = await response.json();
+                console.log('API call successful, result:', result);
+                return result;
             } catch (error) {
                 console.error('API call failed:', error);
                 throw error;
@@ -1669,6 +1677,7 @@
             }
             
             try {
+                console.log('Attempting to delete CIS group:', groupId);
                 await apiCall(`/api/cis-groups/${groupId}`, {
                     method: 'DELETE'
                 });
@@ -1678,12 +1687,15 @@
             } catch (error) {
                 console.error('Delete CIS group error:', error);
                 console.error('Error message:', error.message);
+                console.error('Error status:', error.status);
+                console.error('Full error object:', JSON.stringify(error, null, 2));
                 
                 // Extract error message from response if available
                 let errorMessage = 'Failed to delete CIS group';
                 if (error.message) {
                     errorMessage = error.message;
                 }
+                console.log('Showing notification with message:', errorMessage);
                 showNotification(errorMessage, 'error');
             }
         }
