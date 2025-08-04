@@ -1,4 +1,4 @@
-# Asset Topology Management System
+# AssetDNA
 
 A modern web application for managing and organizing infrastructure assets with an interactive topology view.
 

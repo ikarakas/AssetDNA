@@ -197,7 +197,7 @@ def export_json():
         io.BytesIO(output.getvalue().encode()),
         mimetype='application/json',
         as_attachment=True,
-        download_name='asset_topology.json'
+        download_name='assetdna.json'
     )
 
 @app.route('/api/export/jsonl')
@@ -214,7 +214,7 @@ def export_jsonl():
         io.BytesIO(output.getvalue().encode()),
         mimetype='application/json',
         as_attachment=True,
-        download_name='asset_topology.jsonl'
+        download_name='assetdna.jsonl'
     )
 
 @app.route('/api/stats')
