@@ -812,6 +812,39 @@
             </form>
         </div>
     </div>
+
+    <!-- Edit Environment Modal -->
+    <div id="editEnvironmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Environment</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="editEnvironmentForm">
+                <input type="hidden" id="editEnvironmentId">
+                <div class="form-group">
+                    <label for="editEnvironmentName">Environment Name</label>
+                    <input type="text" id="editEnvironmentName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editEnvironmentCategory">Category</label>
+                    <input type="text" id="editEnvironmentCategory" placeholder="e.g., PROD, DEV, TEST, LABS" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editEnvironmentDescription">Description</label>
+                    <textarea id="editEnvironmentDescription" rows="3"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Environment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     
     <!-- Add CIS Group Modal -->
     <div id="addCisGroupModal" class="modal">
@@ -868,6 +901,7 @@
             document.getElementById('assetForm').addEventListener('submit', handleAddAsset);
             document.getElementById('editAssetForm').addEventListener('submit', handleEditAsset);
             document.getElementById('addEnvironmentForm').addEventListener('submit', handleAddEnvironment);
+            document.getElementById('editEnvironmentForm').addEventListener('submit', handleEditEnvironment);
             document.getElementById('addCisGroupForm').addEventListener('submit', handleAddCisGroup);
             document.getElementById('editMode').addEventListener('click', toggleEditMode);
             document.getElementById('searchAssets').addEventListener('input', handleAssetSearch);
@@ -1577,6 +1611,9 @@
                             </div>
                         </div>
                         <div>
+                            <button class="btn btn-primary btn-small" onclick="editEnvironment(${env.id})" style="margin-right: 5px;">
+                                <i class="fas fa-edit"></i>
+                            </button>
                             <button class="btn btn-danger btn-small" onclick="deleteEnvironment(${env.id})">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -1647,6 +1684,46 @@
                 loadEnvironments();
             } catch (error) {
                 showNotification('Failed to add environment', 'error');
+            }
+        }
+
+        function editEnvironment(environmentId) {
+            const environment = environments.find(env => env.id === environmentId);
+            if (!environment) {
+                showNotification('Environment not found', 'error');
+                return;
+            }
+            
+            document.getElementById('editEnvironmentId').value = environment.id;
+            document.getElementById('editEnvironmentName').value = environment.name;
+            document.getElementById('editEnvironmentCategory').value = environment.category;
+            document.getElementById('editEnvironmentDescription').value = environment.description || '';
+            
+            document.getElementById('editEnvironmentModal').style.display = 'block';
+        }
+
+        async function handleEditEnvironment(event) {
+            event.preventDefault();
+            
+            const environmentId = document.getElementById('editEnvironmentId').value;
+            const environmentData = {
+                name: document.getElementById('editEnvironmentName').value,
+                category: document.getElementById('editEnvironmentCategory').value,
+                description: document.getElementById('editEnvironmentDescription').value
+            };
+            
+            try {
+                await apiCall(`/api/environments/${environmentId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(environmentData)
+                });
+                
+                showNotification('Environment updated successfully!');
+                document.getElementById('editEnvironmentModal').style.display = 'none';
+                loadEnvironments();
+                loadTopology(); // Refresh topology to reflect changes
+            } catch (error) {
+                showNotification('Failed to update environment', 'error');
             }
         }
         
