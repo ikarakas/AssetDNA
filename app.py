@@ -51,6 +51,7 @@ class Asset(db.Model):
     ip_address = db.Column(db.String(45))
     operating_system = db.Column(db.String(100))
     description = db.Column(db.Text)
+    aircraft_identical = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -66,6 +67,7 @@ class Asset(db.Model):
             'ipAddress': self.ip_address,
             'os': self.operating_system,
             'description': self.description,
+            'aircraftIdentical': self.aircraft_identical,
             'createdAt': self.created_at.isoformat() if self.created_at else None,
             'updatedAt': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -247,7 +249,8 @@ def create_asset():
         location=data['location'],
         ip_address=data.get('ipAddress'),
         operating_system=data.get('os'),
-        description=data.get('description')
+        description=data.get('description'),
+        aircraft_identical=data.get('aircraftIdentical', False)
     )
     
     db.session.add(asset)
@@ -272,8 +275,9 @@ def update_asset(asset_id):
     asset.name = data.get('name', asset.name)
     asset.location = data.get('location', asset.location)
     asset.ip_address = data.get('ipAddress', asset.ip_address)
-    asset.operating_system = data.get('os', asset.os)
+    asset.operating_system = data.get('os', asset.operating_system)
     asset.description = data.get('description', asset.description)
+    asset.aircraft_identical = data.get('aircraftIdentical', asset.aircraft_identical)
     
     db.session.commit()
     
@@ -426,7 +430,8 @@ def init_sample_data():
                 'location': 'Rack 3A, Building 1',
                 'ip_address': '192.168.1.10',
                 'operating_system': 'Ubuntu 18.04 LTS',
-                'description': 'Main web server for NSUSS/NMT applications'
+                'description': 'Main web server for NSUSS/NMT applications',
+                'aircraft_identical': False
             },
             {
                 'environment': 'NSUSS/NMT SDE',
@@ -436,7 +441,8 @@ def init_sample_data():
                 'location': 'Rack 3B, Building 1',
                 'ip_address': '192.168.1.20',
                 'operating_system': 'CentOS 7',
-                'description': 'Primary database server'
+                'description': 'Primary database server',
+                'aircraft_identical': True
             },
             {
                 'environment': 'FLEP SDE',
@@ -446,7 +452,8 @@ def init_sample_data():
                 'location': 'AWS us-east-1',
                 'ip_address': '10.0.1.100',
                 'operating_system': 'Ubuntu 22.04 LTS',
-                'description': 'FLEP API microservice'
+                'description': 'FLEP API microservice',
+                'aircraft_identical': False
             },
             {
                 'environment': 'MS1',
@@ -456,7 +463,8 @@ def init_sample_data():
                 'location': 'MS1 Lab, Rack 1',
                 'ip_address': '172.16.1.10',
                 'operating_system': 'RHEL 9',
-                'description': 'High-performance computing server'
+                'description': 'High-performance computing server',
+                'aircraft_identical': True
             },
             {
                 'environment': 'CONNECT LAB',
@@ -466,7 +474,8 @@ def init_sample_data():
                 'location': 'CONNECT LAB, Rack A1',
                 'ip_address': '172.16.4.10',
                 'operating_system': 'Ubuntu 22.04 LTS',
-                'description': 'Connectivity testing server'
+                'description': 'Connectivity testing server',
+                'aircraft_identical': False
             }
         ]
         
@@ -484,7 +493,8 @@ def init_sample_data():
                 location=asset_data['location'],
                 ip_address=asset_data['ip_address'],
                 operating_system=asset_data['operating_system'],
-                description=asset_data['description']
+                description=asset_data['description'],
+                aircraft_identical=asset_data['aircraft_identical']
             )
             db.session.add(asset)
         

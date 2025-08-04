@@ -569,6 +569,16 @@
                         <textarea id="description" rows="3" placeholder="Additional details..."></textarea>
                     </div>
                     
+                    <div class="form-group">
+                        <label for="aircraftIdentical">
+                            <input type="checkbox" id="aircraftIdentical" style="width: auto; margin-right: 8px;">
+                            Aircraft Identical
+                        </label>
+                        <small style="color: #6b7280; display: block; margin-top: 4px;">
+                            Check if this asset must be aircraft-identical hardware
+                        </small>
+                    </div>
+                    
                     <button type="submit" class="btn">
                         <i class="fas fa-plus"></i> Add Asset
                     </button>
@@ -747,6 +757,16 @@
                 <div class="form-group">
                     <label for="editDescription">Description</label>
                     <textarea id="editDescription" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editAircraftIdentical">
+                        <input type="checkbox" id="editAircraftIdentical" style="width: auto; margin-right: 8px;">
+                        Aircraft Identical
+                    </label>
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">
+                        Check if this asset must be aircraft-identical hardware
+                    </small>
                 </div>
                 
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">
@@ -979,7 +999,8 @@
                 location: document.getElementById('physicalLocation').value,
                 ipAddress: document.getElementById('ipAddress').value,
                 os: document.getElementById('operatingSystem').value,
-                description: document.getElementById('description').value
+                description: document.getElementById('description').value,
+                aircraftIdentical: document.getElementById('aircraftIdentical').checked
             };
             
             try {
@@ -1009,7 +1030,8 @@
                 location: document.getElementById('editPhysicalLocation').value,
                 ipAddress: document.getElementById('editIpAddress').value,
                 os: document.getElementById('editOperatingSystem').value,
-                description: document.getElementById('editDescription').value
+                description: document.getElementById('editDescription').value,
+                aircraftIdentical: document.getElementById('editAircraftIdentical').checked
             };
             
             try {
@@ -1175,6 +1197,7 @@
                         </div>
                         <div class="asset-badge">${asset.type}</div>
                         <div class="asset-id-badge">${asset.id}</div>
+                        ${asset.aircraftIdentical ? '<div class="asset-badge" style="background: #dc2626; color: white;">Aircraft Identical</div>' : ''}
                         ${editModeEnabled ? `
                             <div class="asset-actions">
                                 <button class="btn btn-small" onclick="event.stopPropagation(); openEditModal('${asset.id}')">
@@ -1328,6 +1351,7 @@
             document.getElementById('editIpAddress').value = asset.ipAddress || '';
             document.getElementById('editOperatingSystem').value = asset.os || '';
             document.getElementById('editDescription').value = asset.description || '';
+            document.getElementById('editAircraftIdentical').checked = asset.aircraftIdentical || false;
             
             document.getElementById('editModal').style.display = 'block';
         }
@@ -1360,6 +1384,7 @@
                         <div class="asset-id-badge">${asset.id}</div>
                         <div class="asset-badge">${asset.type}</div>
                         <div class="environment-badge">${asset.environment}</div>
+                        ${asset.aircraftIdentical ? '<div class="asset-badge" style="background: #dc2626; color: white;">Aircraft Identical</div>' : ''}
                     </div>
                     <h4 style="margin: 0 0 5px 0; color: #2d3748;">${asset.name}</h4>
                     <div style="font-size: 14px; color: #4a5568; line-height: 1.5;">
