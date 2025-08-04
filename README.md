@@ -54,7 +54,7 @@ A modern web application for managing and organizing infrastructure assets with 
    ```
 
 3. **Access the application**:
-   Open your web browser and navigate to `http://localhost:5000`
+   Open your web browser and navigate to `http://localhost:5050`
 
 ## Usage
 
