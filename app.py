@@ -96,9 +96,8 @@ def get_environment_category(environment):
     if env_obj:
         return env_obj.category
     
-    # Fallback to hardcoded logic for backward compatibility
-    lab_environments = ['MS1', 'FLEP SIL', 'ESM DBE', 'CONNECT LAB']
-    return 'LABS' if environment in lab_environments else 'SDE'
+    # If environment doesn't exist in database, return a default category
+    return 'OTHER'
 
 @app.route('/')
 def index():
@@ -114,10 +113,7 @@ def get_environments():
 def create_environment():
     data = request.json
     
-    # Validate category
-    if data['category'] not in ['SDE', 'LABS']:
-        return jsonify({'error': 'Category must be SDE or LABS'}), 400
-    
+    # Allow any category - no validation needed
     environment = Environment(
         name=data['name'],
         category=data['category'],
@@ -133,9 +129,6 @@ def create_environment():
 def update_environment(env_id):
     environment = Environment.query.get_or_404(env_id)
     data = request.json
-    
-    if 'category' in data and data['category'] not in ['SDE', 'LABS']:
-        return jsonify({'error': 'Category must be SDE or LABS'}), 400
     
     environment.name = data.get('name', environment.name)
     environment.category = data.get('category', environment.category)
@@ -314,13 +307,21 @@ def move_asset():
 def get_topology():
     assets = Asset.query.all()
     
-    topology = {
-        'SDE': {},
-        'LABS': {}
-    }
+    # Get all unique categories from environments
+    categories = db.session.query(Environment.category).distinct().all()
+    category_list = [cat[0] for cat in categories]
+    
+    # Initialize topology with dynamic categories
+    topology = {}
+    for category in category_list:
+        topology[category] = {}
     
     for asset in assets:
         category = get_environment_category(asset.environment)
+        
+        # Create category if it doesn't exist (for backward compatibility)
+        if category not in topology:
+            topology[category] = {}
         
         if asset.environment not in topology[category]:
             topology[category][asset.environment] = {}
@@ -381,8 +382,8 @@ def init_sample_data():
     # Initialize default environments if none exist
     if Environment.query.count() == 0:
         default_environments = [
-            {'name': 'NSUSS/NMT SDE', 'category': 'SDE', 'description': 'NSUSS/NMT Software Development Environment'},
-            {'name': 'FLEP SDE', 'category': 'SDE', 'description': 'FLEP Software Development Environment'},
+            {'name': 'NSUSS/NMT SDE', 'category': 'DEV', 'description': 'NSUSS/NMT Software Development Environment'},
+            {'name': 'FLEP SDE', 'category': 'DEV', 'description': 'FLEP Software Development Environment'},
             {'name': 'MS1', 'category': 'LABS', 'description': 'MS1 Laboratory Environment'},
             {'name': 'FLEP SIL', 'category': 'LABS', 'description': 'FLEP Software-in-the-Loop Laboratory'},
             {'name': 'ESM DBE', 'category': 'LABS', 'description': 'ESM Database Environment'},
