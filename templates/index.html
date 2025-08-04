@@ -908,6 +908,12 @@
                     throw error;
                 }
                 
+                // For DELETE requests that return 204 (no content), don't try to parse JSON
+                if (response.status === 204) {
+                    console.log('API call successful (204 No Content)');
+                    return null;
+                }
+                
                 const result = await response.json();
                 console.log('API call successful, result:', result);
                 return result;
