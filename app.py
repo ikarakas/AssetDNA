@@ -10,6 +10,36 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///asset_topology.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+class Environment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    category = db.Column(db.String(20), nullable=False)  # 'SDE' or 'LABS'
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'category': self.category,
+            'description': self.description,
+            'createdAt': self.created_at.isoformat() if self.created_at else None
+        }
+
+class CisGroup(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'createdAt': self.created_at.isoformat() if self.created_at else None
+        }
+
 class Asset(db.Model):
     id = db.Column(db.String(20), primary_key=True)
     urn = db.Column(db.String(200), unique=True, nullable=False)
@@ -40,6 +70,12 @@ class Asset(db.Model):
             'updatedAt': self.updated_at.isoformat() if self.updated_at else None
         }
 
+# Static asset types - these remain predefined for consistency
+ASSET_TYPES = [
+    'Server', 'Workstation', 'Laptop', 'Network Device', 
+    'Storage', 'Virtual Machine', 'Container', 'Other'
+]
+
 def generate_asset_id():
     last_asset = Asset.query.order_by(Asset.id.desc()).first()
     if last_asset:
@@ -55,12 +91,124 @@ def generate_urn(environment, cis_group, asset_name):
     return f"urn:asset:{org}:{env_code}:{cis_code}:{asset_code}"
 
 def get_environment_category(environment):
+    # Check if environment exists in database
+    env_obj = Environment.query.filter_by(name=environment).first()
+    if env_obj:
+        return env_obj.category
+    
+    # Fallback to hardcoded logic for backward compatibility
     lab_environments = ['MS1', 'FLEP SIL', 'ESM DBE', 'CONNECT LAB']
     return 'LABS' if environment in lab_environments else 'SDE'
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+# Environment management endpoints
+@app.route('/api/environments', methods=['GET'])
+def get_environments():
+    environments = Environment.query.all()
+    return jsonify([env.to_dict() for env in environments])
+
+@app.route('/api/environments', methods=['POST'])
+def create_environment():
+    data = request.json
+    
+    # Validate category
+    if data['category'] not in ['SDE', 'LABS']:
+        return jsonify({'error': 'Category must be SDE or LABS'}), 400
+    
+    environment = Environment(
+        name=data['name'],
+        category=data['category'],
+        description=data.get('description', '')
+    )
+    
+    db.session.add(environment)
+    db.session.commit()
+    
+    return jsonify(environment.to_dict()), 201
+
+@app.route('/api/environments/<int:env_id>', methods=['PUT'])
+def update_environment(env_id):
+    environment = Environment.query.get_or_404(env_id)
+    data = request.json
+    
+    if 'category' in data and data['category'] not in ['SDE', 'LABS']:
+        return jsonify({'error': 'Category must be SDE or LABS'}), 400
+    
+    environment.name = data.get('name', environment.name)
+    environment.category = data.get('category', environment.category)
+    environment.description = data.get('description', environment.description)
+    
+    db.session.commit()
+    
+    return jsonify(environment.to_dict())
+
+@app.route('/api/environments/<int:env_id>', methods=['DELETE'])
+def delete_environment(env_id):
+    environment = Environment.query.get_or_404(env_id)
+    
+    # Check if environment is in use
+    assets_using_env = Asset.query.filter_by(environment=environment.name).count()
+    if assets_using_env > 0:
+        return jsonify({'error': f'Cannot delete environment. {assets_using_env} assets are using it.'}), 400
+    
+    db.session.delete(environment)
+    db.session.commit()
+    
+    return '', 204
+
+# CIS Group management endpoints
+@app.route('/api/cis-groups', methods=['GET'])
+def get_cis_groups():
+    cis_groups = CisGroup.query.all()
+    return jsonify([group.to_dict() for group in cis_groups])
+
+@app.route('/api/cis-groups', methods=['POST'])
+def create_cis_group():
+    data = request.json
+    
+    cis_group = CisGroup(
+        name=data['name'],
+        description=data.get('description', '')
+    )
+    
+    db.session.add(cis_group)
+    db.session.commit()
+    
+    return jsonify(cis_group.to_dict()), 201
+
+@app.route('/api/cis-groups/<int:group_id>', methods=['PUT'])
+def update_cis_group(group_id):
+    cis_group = CisGroup.query.get_or_404(group_id)
+    data = request.json
+    
+    cis_group.name = data.get('name', cis_group.name)
+    cis_group.description = data.get('description', cis_group.description)
+    
+    db.session.commit()
+    
+    return jsonify(cis_group.to_dict())
+
+@app.route('/api/cis-groups/<int:group_id>', methods=['DELETE'])
+def delete_cis_group(group_id):
+    cis_group = CisGroup.query.get_or_404(group_id)
+    
+    # Check if CIS group is in use
+    assets_using_group = Asset.query.filter_by(cis_group=cis_group.name).count()
+    if assets_using_group > 0:
+        return jsonify({'error': f'Cannot delete CIS group. {assets_using_group} assets are using it.'}), 400
+    
+    db.session.delete(cis_group)
+    db.session.commit()
+    
+    return '', 204
+
+# Asset types endpoint
+@app.route('/api/asset-types')
+def get_asset_types():
+    return jsonify(ASSET_TYPES)
 
 @app.route('/api/assets', methods=['GET'])
 def get_assets():
@@ -131,7 +279,7 @@ def update_asset(asset_id):
     asset.name = data.get('name', asset.name)
     asset.location = data.get('location', asset.location)
     asset.ip_address = data.get('ipAddress', asset.ip_address)
-    asset.operating_system = data.get('os', asset.operating_system)
+    asset.operating_system = data.get('os', asset.os)
     asset.description = data.get('description', asset.description)
     
     db.session.commit()
@@ -230,6 +378,43 @@ def get_stats():
     })
 
 def init_sample_data():
+    # Initialize default environments if none exist
+    if Environment.query.count() == 0:
+        default_environments = [
+            {'name': 'NSUSS/NMT SDE', 'category': 'SDE', 'description': 'NSUSS/NMT Software Development Environment'},
+            {'name': 'FLEP SDE', 'category': 'SDE', 'description': 'FLEP Software Development Environment'},
+            {'name': 'MS1', 'category': 'LABS', 'description': 'MS1 Laboratory Environment'},
+            {'name': 'FLEP SIL', 'category': 'LABS', 'description': 'FLEP Software-in-the-Loop Laboratory'},
+            {'name': 'ESM DBE', 'category': 'LABS', 'description': 'ESM Database Environment'},
+            {'name': 'CONNECT LAB', 'category': 'LABS', 'description': 'Connectivity Testing Laboratory'}
+        ]
+        
+        for env_data in default_environments:
+            env = Environment(**env_data)
+            db.session.add(env)
+        
+        db.session.commit()
+        print("Default environments initialized!")
+    
+    # Initialize default CIS groups if none exist
+    if CisGroup.query.count() == 0:
+        default_cis_groups = [
+            {'name': 'Network Infrastructure', 'description': 'Network devices and infrastructure components'},
+            {'name': 'Cloud Infrastructure', 'description': 'Cloud-based services and virtual resources'},
+            {'name': 'Research Equipment', 'description': 'Research and development equipment'},
+            {'name': 'Connectivity Testing', 'description': 'Connectivity and network testing equipment'},
+            {'name': 'Data Storage', 'description': 'Storage systems and data management'},
+            {'name': 'Application Servers', 'description': 'Application hosting and server infrastructure'}
+        ]
+        
+        for group_data in default_cis_groups:
+            group = CisGroup(**group_data)
+            db.session.add(group)
+        
+        db.session.commit()
+        print("Default CIS groups initialized!")
+    
+    # Initialize sample assets if none exist
     if Asset.query.count() == 0:
         sample_assets = [
             {
