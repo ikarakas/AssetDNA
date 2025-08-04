@@ -872,6 +872,34 @@
             </form>
         </div>
     </div>
+
+    <!-- Edit CIS Group Modal -->
+    <div id="editCisGroupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit CIS Group</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="editCisGroupForm">
+                <input type="hidden" id="editCisGroupId">
+                <div class="form-group">
+                    <label for="editCisGroupName">CIS Group Name</label>
+                    <input type="text" id="editCisGroupName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editCisGroupDescription">Description</label>
+                    <textarea id="editCisGroupDescription" rows="3"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update CIS Group
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     
     <!-- Notification -->
     <div id="notification" class="notification"></div>
@@ -903,6 +931,7 @@
             document.getElementById('addEnvironmentForm').addEventListener('submit', handleAddEnvironment);
             document.getElementById('editEnvironmentForm').addEventListener('submit', handleEditEnvironment);
             document.getElementById('addCisGroupForm').addEventListener('submit', handleAddCisGroup);
+            document.getElementById('editCisGroupForm').addEventListener('submit', handleEditCisGroup);
             document.getElementById('editMode').addEventListener('click', toggleEditMode);
             document.getElementById('searchAssets').addEventListener('input', handleAssetSearch);
             document.getElementById('filterEnvironment').addEventListener('change', handleAdvancedSearch);
@@ -1644,6 +1673,9 @@
                             </div>
                         </div>
                         <div>
+                            <button class="btn btn-primary btn-small" onclick="editCisGroup(${group.id})" style="margin-right: 5px;">
+                                <i class="fas fa-edit"></i>
+                            </button>
                             <button class="btn btn-danger btn-small" onclick="deleteCisGroup(${group.id})">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -1747,6 +1779,44 @@
                 loadCisGroups();
             } catch (error) {
                 showNotification('Failed to add CIS group', 'error');
+            }
+        }
+
+        function editCisGroup(cisGroupId) {
+            const cisGroup = cisGroups.find(group => group.id === cisGroupId);
+            if (!cisGroup) {
+                showNotification('CIS Group not found', 'error');
+                return;
+            }
+            
+            document.getElementById('editCisGroupId').value = cisGroup.id;
+            document.getElementById('editCisGroupName').value = cisGroup.name;
+            document.getElementById('editCisGroupDescription').value = cisGroup.description || '';
+            
+            document.getElementById('editCisGroupModal').style.display = 'block';
+        }
+
+        async function handleEditCisGroup(event) {
+            event.preventDefault();
+            
+            const cisGroupId = document.getElementById('editCisGroupId').value;
+            const cisGroupData = {
+                name: document.getElementById('editCisGroupName').value,
+                description: document.getElementById('editCisGroupDescription').value
+            };
+            
+            try {
+                await apiCall(`/api/cis-groups/${cisGroupId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(cisGroupData)
+                });
+                
+                showNotification('CIS Group updated successfully!');
+                document.getElementById('editCisGroupModal').style.display = 'none';
+                loadCisGroups();
+                loadTopology(); // Refresh topology to reflect changes
+            } catch (error) {
+                showNotification('Failed to update CIS group', 'error');
             }
         }
         
