@@ -895,8 +895,11 @@
                         }
                     } catch (e) {
                         // If we can't parse JSON, use default message
+                        console.error('Failed to parse error response:', e);
                     }
-                    throw new Error(errorMessage);
+                    const error = new Error(errorMessage);
+                    error.status = response.status;
+                    throw error;
                 }
                 
                 return await response.json();
@@ -1648,9 +1651,12 @@
                 showNotification('Environment deleted successfully!');
                 loadEnvironments();
             } catch (error) {
+                console.error('Delete environment error:', error);
+                console.error('Error message:', error.message);
+                
                 // Extract error message from response if available
                 let errorMessage = 'Failed to delete environment';
-                if (error.message && error.message.includes('Cannot delete environment')) {
+                if (error.message) {
                     errorMessage = error.message;
                 }
                 showNotification(errorMessage, 'error');
@@ -1670,9 +1676,12 @@
                 showNotification('CIS Group deleted successfully!');
                 loadCisGroups();
             } catch (error) {
+                console.error('Delete CIS group error:', error);
+                console.error('Error message:', error.message);
+                
                 // Extract error message from response if available
                 let errorMessage = 'Failed to delete CIS group';
-                if (error.message && error.message.includes('Cannot delete CIS group')) {
+                if (error.message) {
                     errorMessage = error.message;
                 }
                 showNotification(errorMessage, 'error');
