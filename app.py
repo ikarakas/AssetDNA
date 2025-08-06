@@ -129,7 +129,7 @@ def call_perseus_api(asset_data):
     """
     try:
         # Perseus API endpoint (to be configured)
-        perseus_url = "http://localhost:5001/api/scan"  # Default Perseus service URL
+        perseus_url = "http://localhost:8000/api/scan"  # Perseus service URL
         
         # Prepare scan request
         scan_request = {
