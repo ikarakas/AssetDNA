@@ -376,6 +376,16 @@ def update_asset(asset_id):
     
     db.session.commit()
     
+    # Trigger security scan if OS or IP changed (async - don't block the response)
+    if 'os' in data or 'ipAddress' in data:
+        try:
+            scan_results = call_perseus_api(asset.to_dict())
+            if scan_results:
+                update_asset_security_status(asset, scan_results)
+                db.session.commit()
+        except Exception as e:
+            print(f"Security scan failed for asset {asset_id}: {e}")
+    
     return jsonify(asset.to_dict())
 
 @app.route('/api/assets/<asset_id>', methods=['DELETE'])
