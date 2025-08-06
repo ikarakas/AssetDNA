@@ -426,8 +426,8 @@ def init_sample_data():
         default_cis_groups = [
             {'name': 'Network Infrastructure', 'description': 'Network devices and infrastructure components'},
             {'name': 'Cloud Infrastructure', 'description': 'Cloud-based services and virtual resources'},
-            {'name': 'Research Equipment', 'description': 'Research and development equipment'},
-            {'name': 'Connectivity Testing', 'description': 'Connectivity and network testing equipment'},
+            {'name': 'Special Test Equipment', 'description': 'Special test equipment and development tools'},
+            {'name': 'Interop HW/SW', 'description': 'Interoperability hardware and software testing equipment'},
             {'name': 'Data Storage', 'description': 'Storage systems and data management'},
             {'name': 'Application Servers', 'description': 'Application hosting and server infrastructure'}
         ]
@@ -477,7 +477,7 @@ def init_sample_data():
             },
             {
                 'environment': 'MS1',
-                'cis_group': 'Research Equipment',
+                'cis_group': 'Special Test Equipment',
                 'asset_type': 'Server',
                 'name': 'MS1-COMPUTE-01',
                 'location': 'MS1 Lab, Rack 1',
@@ -488,13 +488,13 @@ def init_sample_data():
             },
             {
                 'environment': 'CONNECT LAB',
-                'cis_group': 'Connectivity Testing',
+                'cis_group': 'Interop HW/SW',
                 'asset_type': 'Server',
                 'name': 'CONNECT-SRV-01',
                 'location': 'CONNECT LAB, Rack A1',
                 'ip_address': '172.16.4.10',
                 'operating_system': 'Ubuntu 22.04 LTS',
-                'description': 'Connectivity testing server',
+                'description': 'Interoperability testing server',
                 'aircraft_identical': False
             }
         ]
