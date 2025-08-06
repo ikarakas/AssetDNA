@@ -4,8 +4,6 @@ from datetime import datetime
 import json
 import io
 import re
-import requests
-from datetime import datetime
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///asset_topology.db'
@@ -57,15 +55,7 @@ class Asset(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Security scanning fields
-    security_scan_date = db.Column(db.DateTime)
-    cve_count = db.Column(db.Integer, default=0)
-    critical_cves = db.Column(db.Integer, default=0)
-    high_cves = db.Column(db.Integer, default=0)
-    medium_cves = db.Column(db.Integer, default=0)
-    low_cves = db.Column(db.Integer, default=0)
-    security_status = db.Column(db.String(20), default='Unknown')  # Safe, Warning, Critical, Unknown
-    last_scan_result = db.Column(db.Text)  # JSON string of detailed scan results
+
     
     def to_dict(self):
         return {
@@ -81,15 +71,7 @@ class Asset(db.Model):
             'description': self.description,
             'aircraftIdentical': self.aircraft_identical,
             'createdAt': self.created_at.isoformat() if self.created_at else None,
-            'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
-            'securityScanDate': self.security_scan_date.isoformat() if self.security_scan_date else None,
-            'cveCount': self.cve_count,
-            'criticalCves': self.critical_cves,
-            'highCves': self.high_cves,
-            'mediumCves': self.medium_cves,
-            'lowCves': self.low_cves,
-            'securityStatus': self.security_status,
-            'lastScanResult': self.last_scan_result
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None
         }
 
 # Static asset types - these remain predefined for consistency
@@ -121,71 +103,7 @@ def get_environment_category(environment):
     # If environment doesn't exist in database, return a default category
     return 'OTHER'
 
-# Perseus API integration
-def call_perseus_api(asset_data):
-    """
-    Call Perseus API to scan an asset for vulnerabilities
-    Returns scan results or None if scan fails
-    """
-    try:
-        # Perseus API endpoint (to be configured)
-        perseus_url = "http://localhost:8000/api/scan"  # Perseus service URL
-        
-        # Prepare scan request
-        scan_request = {
-            'asset_id': asset_data['id'],
-            'asset_name': asset_data['name'],
-            'operating_system': asset_data.get('os', ''),
-            'ip_address': asset_data.get('ipAddress', ''),
-            'scan_type': 'vulnerability_scan'
-        }
-        
-        # Call Perseus API
-        response = requests.post(perseus_url, json=scan_request, timeout=30)
-        
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f"Perseus API error: {response.status_code} - {response.text}")
-            return None
-            
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to call Perseus API: {e}")
-        return None
 
-def update_asset_security_status(asset, scan_results):
-    """
-    Update asset security fields based on scan results
-    """
-    if not scan_results:
-        return
-    
-    try:
-        # Parse scan results
-        cve_data = scan_results.get('cve_data', {})
-        
-        # Update security fields
-        asset.security_scan_date = datetime.utcnow()
-        asset.cve_count = cve_data.get('total_cves', 0)
-        asset.critical_cves = cve_data.get('critical', 0)
-        asset.high_cves = cve_data.get('high', 0)
-        asset.medium_cves = cve_data.get('medium', 0)
-        asset.low_cves = cve_data.get('low', 0)
-        asset.last_scan_result = json.dumps(scan_results)
-        
-        # Determine security status
-        if asset.critical_cves > 0:
-            asset.security_status = 'Critical'
-        elif asset.high_cves > 0:
-            asset.security_status = 'Warning'
-        elif asset.medium_cves > 0 or asset.low_cves > 0:
-            asset.security_status = 'Warning'
-        else:
-            asset.security_status = 'Safe'
-            
-    except Exception as e:
-        print(f"Error updating security status: {e}")
-        asset.security_status = 'Unknown'
 
 @app.route('/')
 def index():
@@ -342,15 +260,6 @@ def create_asset():
     db.session.add(asset)
     db.session.commit()
     
-    # Trigger security scan (async - don't block the response)
-    try:
-        scan_results = call_perseus_api(asset.to_dict())
-        if scan_results:
-            update_asset_security_status(asset, scan_results)
-            db.session.commit()
-    except Exception as e:
-        print(f"Security scan failed for asset {asset_id}: {e}")
-    
     return jsonify(asset.to_dict()), 201
 
 @app.route('/api/assets/<asset_id>', methods=['PUT'])
@@ -375,16 +284,6 @@ def update_asset(asset_id):
     asset.aircraft_identical = data.get('aircraftIdentical', asset.aircraft_identical)
     
     db.session.commit()
-    
-    # Trigger security scan if OS or IP changed (async - don't block the response)
-    if 'os' in data or 'ipAddress' in data:
-        try:
-            scan_results = call_perseus_api(asset.to_dict())
-            if scan_results:
-                update_asset_security_status(asset, scan_results)
-                db.session.commit()
-        except Exception as e:
-            print(f"Security scan failed for asset {asset_id}: {e}")
     
     return jsonify(asset.to_dict())
 
@@ -412,66 +311,7 @@ def move_asset():
     
     return jsonify(asset.to_dict())
 
-@app.route('/api/assets/<asset_id>/scan', methods=['POST'])
-def scan_asset_security(asset_id):
-    """
-    Manually trigger security scan for an asset
-    """
-    asset = Asset.query.get_or_404(asset_id)
-    
-    try:
-        # Call Perseus API
-        scan_results = call_perseus_api(asset.to_dict())
-        
-        if scan_results:
-            update_asset_security_status(asset, scan_results)
-            db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': 'Security scan completed',
-                'asset': asset.to_dict()
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': 'Security scan failed - Perseus service unavailable'
-            }), 503
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'Security scan failed: {str(e)}'
-        }), 500
 
-@app.route('/api/assets/scan-all', methods=['POST'])
-def scan_all_assets():
-    """
-    Trigger security scan for all assets
-    """
-    assets = Asset.query.all()
-    results = {
-        'total_assets': len(assets),
-        'scanned': 0,
-        'failed': 0,
-        'errors': []
-    }
-    
-    for asset in assets:
-        try:
-            scan_results = call_perseus_api(asset.to_dict())
-            if scan_results:
-                update_asset_security_status(asset, scan_results)
-                results['scanned'] += 1
-            else:
-                results['failed'] += 1
-                results['errors'].append(f"Asset {asset.id}: Perseus service unavailable")
-        except Exception as e:
-            results['failed'] += 1
-            results['errors'].append(f"Asset {asset.id}: {str(e)}")
-    
-    db.session.commit()
-    
-    return jsonify(results)
 
 @app.route('/api/topology')
 def get_topology():
