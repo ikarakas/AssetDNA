@@ -1,0 +1,7 @@
+name,asset_type,parent_name,status,description,version,external_id,properties,tags
+"Main System","Domain / System of Systems",,active,"Top level system",1.0.0,,,
+"Web Server","System / Environment","Main System",active,"Production web server",2.1.0,,"{}","production,critical"
+"Database","System / Environment","Main System",active,"PostgreSQL database",15.0,,"{}","production,database"
+"API Service","Software CI","Web Server",active,"REST API service",1.5.0,API-001,"{}","api,backend"
+"Frontend","Software CI","Web Server",active,"React frontend",3.0.0,FE-001,"{}","frontend,ui"
+"Auth Module","Component / Segment","API Service",active,"Authentication module",1.2.0,,"{}","security,auth"

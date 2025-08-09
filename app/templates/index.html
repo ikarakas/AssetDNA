@@ -2111,6 +2111,9 @@
                     
                     // Reload BOM history
                     loadBOMHistory(currentSelectedAsset.id);
+                    
+                    // Refresh the asset tree to update BOM counts
+                    await loadAssetTree();
                 } else {
                     const errorText = await response.text();
                     console.error('BOM upload failed:', errorText);
@@ -2195,6 +2198,8 @@
                     alert('BOM deleted successfully');
                     // Reload BOM history
                     loadBOMHistory(assetId);
+                    // Refresh the asset tree to update BOM counts
+                    await loadAssetTree();
                 } else {
                     const error = await response.text();
                     alert(`Failed to delete BOM: ${error}`);
