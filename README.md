@@ -1,108 +1,103 @@
-# AssetDNA
+# AssetDNA - BOM Tracking & Historical Analysis System
 
-A modern web application for managing and organizing infrastructure assets with an interactive topology view.
+## Overview
+AssetDNA is a Bill of Materials (BOM) management system designed to track and analyze the evolution of complex technical systems over time. It provides historical tracking of Software Bills of Materials (SBOMs) and enables change analysis reporting.
 
-## Features
+## Key Features
+- **Asset Hierarchy Management**: Fixed taxonomy of asset types from System of Systems down to Configuration Items
+- **Historical BOM Tracking**: Store and version BOMs for each asset over time
+- **Import/Export**: Support for CSV, JSON, and XML formats for OTOBO integration
+- **Tabular Editing**: Excel-like interface for asset management
+- **Change Analysis**: Generate reports showing how assets evolved over time
+- **Unique Identification**: Assets use both UUIDs and URNs
 
-- **Interactive Asset Management**: Add, edit, and delete assets with drag-and-drop functionality
-- **Topology View**: Visual representation of assets organized by environment and CIS groups
-- **Search & Filter**: Advanced search capabilities across all asset properties
-- **Export Functionality**: Export data in JSON and JSONL formats
-- **Responsive Design**: Modern UI that works on desktop and mobile devices
+## Asset Types
+1. Domain / System of Systems
+2. System / Environment  
+3. Subsystem
+4. Component / Segment
+5. Configuration Item (CI)
+6. Hardware CI
+7. Software CI
+8. Firmware CI
 
 ## Technology Stack
-
-- **Backend**: Flask (Python web framework)
-- **Database**: SQLite with SQLAlchemy ORM
-- **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
-- **Styling**: Custom CSS with modern gradients and animations
-
-## Prerequisites
-
-- Python 3.7 or higher
-- pip (Python package installer)
+- **Database**: PostgreSQL 15+
+- **Backend**: Python 3.11+ with FastAPI
+- **ORM**: SQLAlchemy 2.0
+- **Data Validation**: Pydantic
+- **Web Server**: Uvicorn
+- **Frontend**: HTML5 + Vanilla JS (tabular interface)
 
 ## Installation
 
-1. **Clone the repository** (if using git):
-   ```bash
-   git clone <repository-url>
-   cd AssetDNA
-   ```
+### Using Docker (Recommended)
+```bash
+docker-compose up -d
+```
 
-2. **Create a virtual environment**:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+### Manual Installation
+```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Install dependencies
+pip install -r requirements.txt
 
-## Running the Application
+# Initialize database
+alembic upgrade head
 
-1. **Activate the virtual environment** (if not already activated):
-   ```bash
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+# Run application
+python main.py
+```
 
-2. **Run the application**:
-   ```bash
-   python app.py
-   ```
-
-3. **Access the application**:
-   Open your web browser and navigate to `http://localhost:5050`
+## API Documentation
+Once running, API documentation is available at:
+- http://localhost:10001/docs (Swagger UI)
+- http://localhost:10001/redoc (ReDoc)
 
 ## Usage
 
-### Adding Assets
-1. Fill out the asset form in the sidebar
-2. Click "Add Asset" to create a new asset
-3. The asset will appear in the topology view
+### Import Assets
+```bash
+# CSV Import
+curl -X POST http://localhost:10001/api/v1/import/csv \
+  -F "file=@assets.csv"
 
-### Edit Mode
-1. Click "Enable Edit Mode" to activate editing features
-2. Drag and drop assets between environments and CIS groups
-3. Click on assets to edit their properties
-
-### Exporting Data
-- Use the "Export JSON" or "Export JSONL" buttons in the topology view
-- Files will be downloaded to your default download folder
-
-### Search and Filter
-- Use the "Asset List" tab for basic search
-- Use the "Search" tab for advanced filtering by environment, CIS group, and asset type
-
-## Project Structure
-
-```
-AssetDNA/
-├── app.py              # Main Flask application
-├── requirements.txt    # Python dependencies
-├── README.md          # This file
-├── .gitignore         # Git ignore rules
-└── templates/
-    └── index.html     # Main web interface
+# JSON Import  
+curl -X POST http://localhost:10001/api/v1/import/json \
+  -H "Content-Type: application/json" \
+  -d @assets.json
 ```
 
-## API Endpoints
+### Export Assets
+```bash
+# Export to CSV
+curl http://localhost:10001/api/v1/export/csv > assets.csv
 
-- `GET /api/assets` - Get all assets (with optional filters)
-- `POST /api/assets` - Create a new asset
-- `PUT /api/assets/<id>` - Update an asset
-- `DELETE /api/assets/<id>` - Delete an asset
-- `POST /api/assets/move` - Move an asset to different environment/CIS group
-- `GET /api/topology` - Get organized topology data
-- `GET /api/export/json` - Export as JSON
-- `GET /api/export/jsonl` - Export as JSONL
+# Export to JSON
+curl http://localhost:10001/api/v1/export/json > assets.json
 
-## Development
+# Export to XML
+curl http://localhost:10001/api/v1/export/xml > assets.xml
+```
 
-The application includes sample data that will be automatically created when you first run it. The database file (`asset_topology.db`) will be created in the project root directory.
+### Change Analysis
+```bash
+# Get 6-month change report for an asset
+curl http://localhost:10001/api/v1/assets/{asset_id}/changes?months=6
+```
+
+## Database Schema
+- **assets**: Core asset table with hierarchy
+- **asset_types**: Fixed asset type definitions
+- **bom_history**: Historical BOM snapshots
+- **bom_items**: Individual BOM line items
+- **audit_log**: Change tracking
+
+## OTOBO Integration
+AssetDNA is designed to complement OTOBO for asset structure management. Use the import/export features to synchronize data between systems.
 
 ## License
-
-This project is open source and available under the MIT License.
+MIT

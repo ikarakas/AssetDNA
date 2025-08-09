@@ -261,6 +261,7 @@
         .tree-label.asset.dragging {
             opacity: 0.5;
             transform: rotate(5deg);
+            z-index: 1000;
         }
         
         .tree-label.asset:hover {
@@ -274,24 +275,84 @@
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
         }
         
-        .drop-zone {
-            border: 2px dashed #cbd5e0;
-            border-radius: 8px;
-            padding: 10px;
-            margin: 5px 0;
-            transition: all 0.2s;
-            min-height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #9ca3af;
-            font-size: 14px;
+        /* Enhanced drop target highlighting */
+        .tree-label.environment.drag-over,
+        .tree-label.cis.drag-over {
+            background: linear-gradient(135deg, #667eea 0%, #5a67d8 100%) !important;
+            color: white !important;
+            border-color: #4c51bf !important;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4) !important;
+            transform: scale(1.02);
+            transition: all 0.2s ease;
         }
         
-        .drop-zone.drag-over {
-            border-color: #667eea;
+        .tree-label.environment.drag-over .tree-subtitle,
+        .tree-label.cis.drag-over .tree-subtitle {
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+        
+        /* Drop zone indicator */
+        .drop-indicator {
+            border: 3px dashed #667eea;
             background: rgba(102, 126, 234, 0.1);
+            border-radius: 8px;
+            padding: 8px;
+            margin: 4px 0;
+            text-align: center;
             color: #667eea;
+            font-weight: 600;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .drop-indicator.show {
+            display: block;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+        
+        /* Auto-scroll container */
+        .topology-container {
+            max-height: 70vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .auto-scroll-zone {
+            position: fixed;
+            width: 100px;
+            height: 100px;
+            z-index: 999;
+            pointer-events: none;
+        }
+        
+        .auto-scroll-zone.top {
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .auto-scroll-zone.bottom {
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .auto-scroll-zone.left {
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .auto-scroll-zone.right {
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
         }
         
         .tree-toggle {
@@ -351,6 +412,52 @@
             display: flex;
             gap: 5px;
             margin-left: 10px;
+        }
+        
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            transition: all 0.2s;
+        }
+        
+        .checkbox-item:hover {
+            border-color: #667eea;
+            background: #f8fafc;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+        }
+        
+        .checkbox-item label {
+            margin: 0;
+            font-size: 14px;
+            color: #374151;
+            cursor: pointer;
+        }
+        
+        .attribute-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin: 2px;
+            white-space: nowrap;
         }
         
         .asset-badge {
@@ -556,6 +663,16 @@
                     </div>
                     
                     <div class="form-group">
+                        <label>Asset Attributes (Tags)</label>
+                        <div id="attributeCheckboxes" class="checkbox-group">
+                            <!-- Attributes will be loaded here -->
+                        </div>
+                        <small style="color: #6b7280; display: block; margin-top: 4px;">
+                            Select one or more attributes that describe this asset
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
                         <label for="assetType">Asset Type</label>
                         <select id="assetType" required>
                             <option value="">Select Type</option>
@@ -640,9 +757,17 @@
                             </button>
                         </div>
                     </div>
-                    <div id="topologyTree" class="tree-container">
-                        <div class="loading">
-                            <i class="fas fa-spinner fa-spin"></i> Loading topology...
+                    <div class="topology-container">
+                        <!-- Auto-scroll zones -->
+                        <div class="auto-scroll-zone top" id="autoScrollTop"></div>
+                        <div class="auto-scroll-zone bottom" id="autoScrollBottom"></div>
+                        <div class="auto-scroll-zone left" id="autoScrollLeft"></div>
+                        <div class="auto-scroll-zone right" id="autoScrollRight"></div>
+                        
+                        <div id="topologyTree" class="tree-container">
+                            <div class="loading">
+                                <i class="fas fa-spinner fa-spin"></i> Loading topology...
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -749,10 +874,13 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="editCisGroup">CIS Group</label>
-                    <select id="editCisGroup" required>
-                        <option value="">Select CIS Group</option>
-                    </select>
+                    <label>Asset Attributes</label>
+                    <div id="editAttributeCheckboxes" class="checkbox-group">
+                        <!-- Attributes will be loaded here -->
+                    </div>
+                    <small style="color: #6b7280; display: block; margin-top: 4px;">
+                        Select one or more attributes that describe this asset
+                    </small>
                 </div>
                 
                 <div class="form-group">
@@ -938,7 +1066,7 @@
         let currentTopology = {};
         let allAssets = [];
         let environments = [];
-        let cisGroups = [];
+        let attributes = [];
         let assetTypes = [];
         
         // Utility function for debouncing
@@ -997,6 +1125,7 @@
             loadAssets();
             loadEnvironments();
             loadCisGroups();
+            loadAttributes();
             loadAssetTypes();
             setupEventListeners();
             loadFilterOptions();
@@ -1114,6 +1243,15 @@
             }
         }
         
+        async function loadAttributes() {
+            try {
+                attributes = await apiCall('/api/attributes');
+                updateAttributeCheckboxes();
+            } catch (error) {
+                console.error('Failed to load attributes:', error);
+            }
+        }
+        
         async function loadCisGroups() {
             try {
                 cisGroups = await apiCall('/api/cis-groups');
@@ -1136,9 +1274,18 @@
         async function handleAddAsset(event) {
             event.preventDefault();
             
+            // Get selected attributes
+            const selectedAttributes = [];
+            document.querySelectorAll('#attributeCheckboxes input[type="checkbox"]:checked').forEach(checkbox => {
+                selectedAttributes.push(checkbox.value);
+            });
+            
+            console.log('Selected attributes:', selectedAttributes);
+            
             const assetData = {
                 environment: document.getElementById('environment').value,
                 cisGroup: document.getElementById('cisGroup').value,
+                attributes: selectedAttributes,
                 type: document.getElementById('assetType').value,
                 name: document.getElementById('assetName').value,
                 location: document.getElementById('physicalLocation').value,
@@ -1148,17 +1295,25 @@
                 aircraftIdentical: document.getElementById('aircraftIdentical').checked
             };
             
+            console.log('Asset data to send:', assetData);
+            
             try {
-                await apiCall('/api/assets', {
+                const response = await apiCall('/api/assets', {
                     method: 'POST',
                     body: JSON.stringify(assetData)
                 });
                 
+                console.log('Asset created:', response);
                 showNotification('Asset added successfully!');
                 event.target.reset();
+                // Clear checkboxes
+                document.querySelectorAll('#attributeCheckboxes input[type="checkbox"]').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
                 loadTopology();
                 loadAssets();
             } catch (error) {
+                console.error('Failed to add asset:', error);
                 showNotification('Failed to add asset', 'error');
             }
         }
@@ -1166,10 +1321,16 @@
         async function handleEditAsset(event) {
             event.preventDefault();
             
+            // Get selected attributes
+            const selectedAttributes = [];
+            document.querySelectorAll('#editAttributeCheckboxes input[type="checkbox"]:checked').forEach(checkbox => {
+                selectedAttributes.push(checkbox.value);
+            });
+            
             const assetId = document.getElementById('editAssetId').value;
             const assetData = {
                 environment: document.getElementById('editEnvironment').value,
-                cisGroup: document.getElementById('editCisGroup').value,
+                attributes: selectedAttributes,
                 type: document.getElementById('editAssetType').value,
                 name: document.getElementById('editAssetName').value,
                 location: document.getElementById('editPhysicalLocation').value,
@@ -1179,17 +1340,21 @@
                 aircraftIdentical: document.getElementById('editAircraftIdentical').checked
             };
             
+            console.log('Updating asset with data:', assetData);
+            
             try {
-                await apiCall(`/api/assets/${assetId}`, {
+                const response = await apiCall(`/api/assets/${assetId}`, {
                     method: 'PUT',
                     body: JSON.stringify(assetData)
                 });
                 
+                console.log('Asset updated:', response);
                 showNotification('Asset updated successfully!');
                 closeModal();
                 loadTopology();
                 loadAssets();
             } catch (error) {
+                console.error('Failed to update asset:', error);
                 showNotification('Failed to update asset', 'error');
             }
         }
@@ -1218,7 +1383,7 @@
         function renderTopology() {
             const container = document.getElementById('topologyTree');
             
-            if (!currentTopology.SDE && !currentTopology.LABS) {
+            if (!currentTopology.DEV && !currentTopology.LABS) {
                 container.innerHTML = '<div class="loading">No topology data available</div>';
                 return;
             }
@@ -1258,11 +1423,14 @@
             return Object.entries(topology).map(([category, environments]) => {
                 if (Object.keys(environments).length === 0) return '';
                 
-                const categoryAssetCount = Object.values(environments)
-                    .flatMap(env => Object.values(env))
-                    .flat().length;
+                let categoryAssetCount = 0;
+                Object.values(environments).forEach(environment => {
+                    Object.values(environment).forEach(cisGroup => {
+                        categoryAssetCount += cisGroup.length;
+                    });
+                });
                 
-                const categoryIcon = category === 'LABS' ? '🔬' : '💼';
+                const categoryIcon = category === 'LABS' ? '🔬' : category === 'DEV' ? '💼' : '📋';
                 
                 return `
                     <li class="tree-item">
@@ -1292,13 +1460,16 @@
             });
             
             return sortedEnvironments.map(([env, cisGroups]) => {
-                const envAssetCount = Object.values(cisGroups).flat().length;
+                let envAssetCount = 0;
+                Object.values(cisGroups).forEach(cisGroup => {
+                    envAssetCount += cisGroup.length;
+                });
                 const envIcon = getEnvironmentIcon(env);
                 
                 return `
                     <li class="tree-item">
                         <div class="tree-label environment" onclick="toggleNode(this)" 
-                             data-environment="${env}" ondrop="handleDrop(event)" ondragover="handleDragOver(event)">
+                             data-environment="${env}" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
                             <div class="tree-toggle">−</div>
                             <div class="tree-icon">${envIcon}</div>
                             <div class="tree-content">
@@ -1327,7 +1498,7 @@
                 <li class="tree-item">
                     <div class="tree-label cis" onclick="toggleNode(this)"
                          data-environment="${environment}" data-cis-group="${cis}"
-                         ondrop="handleDrop(event)" ondragover="handleDragOver(event)">
+                         ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
                         <div class="tree-toggle">−</div>
                         <div class="tree-icon">📁</div>
                         <div class="tree-content">
@@ -1344,29 +1515,36 @@
         }
         
         function renderAssets(assets) {
-            return assets.map(asset => `
-                <li class="tree-item">
-                    <div class="tree-label asset" draggable="${editModeEnabled}" 
-                         data-asset-id="${asset.id}" ondragstart="handleDragStart(event)"
-                         onclick="editModeEnabled ? openEditModal('${asset.id}') : null">
-                        <div class="tree-icon">${getAssetIcon(asset.type)}</div>
-                        <div class="tree-content">
-                            <div class="tree-title">${asset.name}</div>
-                            <div class="tree-subtitle">${asset.type} • ${asset.location}</div>
-                        </div>
-                        <div class="asset-badge">${asset.type}</div>
-                        <div class="asset-id-badge">${asset.id}</div>
-                        ${asset.aircraftIdentical ? '<div class="asset-badge" style="background: #dc2626; color: white;">Aircraft Identical</div>' : ''}
-                        ${editModeEnabled ? `
-                            <div class="asset-actions">
-                                <button class="btn btn-small" onclick="event.stopPropagation(); openEditModal('${asset.id}')">
-                                    <i class="fas fa-edit"></i>
-                                </button>
+            return assets.map(asset => {
+                const attributeBadges = asset.attributes ? asset.attributes.map(attr => 
+                    `<span class="attribute-badge">${attr}</span>`
+                ).join('') : '';
+                
+                return `
+                    <li class="tree-item">
+                        <div class="tree-label asset" draggable="${editModeEnabled}" 
+                             data-asset-id="${asset.id}" ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)"
+                             onclick="editModeEnabled ? openEditModal('${asset.id}') : null">
+                            <div class="tree-icon">${getAssetIcon(asset.type)}</div>
+                            <div class="tree-content">
+                                <div class="tree-title">${asset.name}</div>
+                                <div class="tree-subtitle">${asset.type} • ${asset.location}</div>
+                                ${attributeBadges ? `<div style="margin-top: 4px;">${attributeBadges}</div>` : ''}
                             </div>
-                        ` : ''}
-                    </div>
-                </li>
-            `).join('');
+                            <div class="asset-badge">${asset.type}</div>
+                            <div class="asset-id-badge">${asset.id}</div>
+                            ${asset.aircraftIdentical ? '<div class="asset-badge" style="background: #dc2626; color: white;">Aircraft Identical</div>' : ''}
+                            ${editModeEnabled ? `
+                                <div class="asset-actions">
+                                    <button class="btn btn-small" onclick="event.stopPropagation(); openEditModal('${asset.id}')">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </li>
+                `;
+            }).join('');
         }
         
         function getEnvironmentIcon(env) {
@@ -1396,19 +1574,47 @@
         }
         
         let draggedAsset = null;
+        let dragStartTime = null;
+        let autoScrollInterval = null;
+        let lastDropTarget = null;
+        let currentMouseY = 0;
         
         function handleDragStart(event) {
             if (!editModeEnabled) return;
             
             draggedAsset = event.target.closest('.tree-label').dataset.assetId;
+            dragStartTime = Date.now();
             event.target.closest('.tree-label').classList.add('dragging');
+            
+            // Start auto-scroll detection
+            startAutoScrollDetection();
         }
         
         function handleDragOver(event) {
             if (!editModeEnabled || !draggedAsset) return;
             
             event.preventDefault();
-            event.target.closest('.tree-label').classList.add('drag-over');
+            const dropTarget = event.target.closest('.tree-label');
+            
+            // Remove previous drag-over class
+            document.querySelectorAll('.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+            
+            // Add drag-over class to current target
+            if (dropTarget && (dropTarget.classList.contains('environment') || dropTarget.classList.contains('cis'))) {
+                dropTarget.classList.add('drag-over');
+                lastDropTarget = dropTarget;
+            }
+        }
+        
+        function handleDragLeave(event) {
+            if (!editModeEnabled || !draggedAsset) return;
+            
+            const dropTarget = event.target.closest('.tree-label');
+            if (dropTarget) {
+                dropTarget.classList.remove('drag-over');
+            }
         }
         
         function handleDrop(event) {
@@ -1416,24 +1622,98 @@
             
             event.preventDefault();
             const dropTarget = event.target.closest('.tree-label');
-            dropTarget.classList.remove('drag-over');
+            
+            // Clear all drag-over classes
+            clearAllDragOverClasses();
             
             const environment = dropTarget.dataset.environment;
             const cisGroup = dropTarget.dataset.cisGroup;
             
             if (environment && draggedAsset) {
-                moveAsset(draggedAsset, environment, cisGroup);
+                // Store the original position for visual feedback
+                const originalAsset = document.querySelector(`[data-asset-id="${draggedAsset}"]`);
+                const originalParent = originalAsset ? originalAsset.closest('.tree-children') : null;
+                
+                moveAsset(draggedAsset, environment, cisGroup, originalParent);
             }
             
+            // Clean up
+            cleanupDragState();
+        }
+        
+        function handleDragEnd(event) {
+            if (!editModeEnabled || !draggedAsset) return;
+            
+            // Clear all drag-over classes
+            clearAllDragOverClasses();
+            
+            // Clean up
+            cleanupDragState();
+        }
+        
+        function clearAllDragOverClasses() {
+            document.querySelectorAll('.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+        }
+        
+        function cleanupDragState() {
             document.querySelectorAll('.dragging').forEach(el => {
                 el.classList.remove('dragging');
             });
             draggedAsset = null;
+            dragStartTime = null;
+            stopAutoScrollDetection();
         }
         
-        async function moveAsset(assetId, environment, cisGroup) {
+        function startAutoScrollDetection() {
+            // Track mouse position during drag
+            const dragOverHandler = function(e) {
+                currentMouseY = e.clientY;
+            };
+            
+            document.addEventListener('dragover', dragOverHandler, { passive: true });
+            
+            autoScrollInterval = setInterval(() => {
+                const windowHeight = window.innerHeight;
+                const scrollSpeed = 15;
+                
+                if (currentMouseY < 100) {
+                    // Scroll up
+                    window.scrollBy(0, -scrollSpeed);
+                } else if (currentMouseY > windowHeight - 100) {
+                    // Scroll down
+                    window.scrollBy(0, scrollSpeed);
+                }
+            }, 50);
+            
+            // Store the handler for cleanup
+            window.currentDragOverHandler = dragOverHandler;
+        }
+        
+        function stopAutoScrollDetection() {
+            if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+            }
+            
+            // Remove the drag over handler
+            if (window.currentDragOverHandler) {
+                document.removeEventListener('dragover', window.currentDragOverHandler);
+                window.currentDragOverHandler = null;
+            }
+        }
+        
+        async function moveAsset(assetId, environment, cisGroup, originalParent) {
             try {
-                await apiCall('/api/assets/move', {
+                // Show immediate visual feedback
+                const assetElement = document.querySelector(`[data-asset-id="${assetId}"]`);
+                if (assetElement) {
+                    assetElement.style.opacity = '0.3';
+                    assetElement.style.transform = 'scale(0.95)';
+                }
+                
+                const response = await apiCall('/api/assets/move', {
                     method: 'POST',
                     body: JSON.stringify({
                         assetId: assetId,
@@ -1442,12 +1722,120 @@
                     })
                 });
                 
-                showNotification('Asset moved successfully!');
-                loadTopology();
-                loadAssets();
+                // Show success notification with details
+                const asset = response;
+                const targetLocation = cisGroup ? `${environment} > ${cisGroup}` : environment;
+                showNotification(`Asset "${asset.name}" moved to ${targetLocation}`, 'success');
+                
+                // Update only the affected sections instead of full reload
+                updateTopologyAfterMove(assetId, environment, cisGroup, originalParent);
+                
             } catch (error) {
                 showNotification('Failed to move asset', 'error');
+                
+                // Restore original appearance on error
+                if (assetElement) {
+                    assetElement.style.opacity = '';
+                    assetElement.style.transform = '';
+                }
             }
+        }
+        
+        function updateTopologyAfterMove(assetId, newEnvironment, newCisGroup, originalParent) {
+            // Find the asset in current topology data
+            const asset = allAssets.find(a => a.id === assetId);
+            if (!asset) return;
+            
+            // Update the asset's position in our local data
+            asset.environment = newEnvironment;
+            if (newCisGroup) {
+                asset.cisGroup = newCisGroup;
+            }
+            
+            // Update the visual representation
+            const assetElement = document.querySelector(`[data-asset-id="${assetId}"]`);
+            if (assetElement) {
+                // Remove from original location
+                assetElement.remove();
+                
+                // Find the new target CIS group and add the asset there
+                const targetCisGroup = document.querySelector(`[data-environment="${newEnvironment}"][data-cis-group="${newCisGroup}"]`);
+                if (targetCisGroup) {
+                    const targetChildren = targetCisGroup.nextElementSibling;
+                    if (targetChildren && targetChildren.classList.contains('tree-children')) {
+                        // Create new asset element
+                        const newAssetElement = createAssetElement(asset);
+                        targetChildren.appendChild(newAssetElement);
+                        
+                        // Update asset counts
+                        updateAssetCounts();
+                    }
+                } else {
+                    // If the target location doesn't exist in the current view, reload the topology
+                    loadTopology();
+                }
+            }
+        }
+        
+        function createAssetElement(asset) {
+            const attributeBadges = asset.attributes ? asset.attributes.map(attr => 
+                `<span class="attribute-badge">${attr}</span>`
+            ).join('') : '';
+            
+            const li = document.createElement('li');
+            li.className = 'tree-item';
+            li.innerHTML = `
+                <div class="tree-label asset" draggable="${editModeEnabled}" 
+                     data-asset-id="${asset.id}" ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)"
+                     onclick="editModeEnabled ? openEditModal('${asset.id}') : null">
+                    <div class="tree-icon">${getAssetIcon(asset.type)}</div>
+                    <div class="tree-content">
+                        <div class="tree-title">${asset.name}</div>
+                        <div class="tree-subtitle">${asset.type} • ${asset.location}</div>
+                        ${attributeBadges ? `<div style="margin-top: 4px;">${attributeBadges}</div>` : ''}
+                    </div>
+                    <div class="asset-badge">${asset.type}</div>
+                    <div class="asset-id-badge">${asset.id}</div>
+                    ${asset.aircraftIdentical ? '<div class="asset-badge" style="background: #dc2626; color: white;">Aircraft Identical</div>' : ''}
+                    ${editModeEnabled ? `
+                        <div class="asset-actions">
+                            <button class="btn btn-small" onclick="event.stopPropagation(); openEditModal('${asset.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            return li;
+        }
+        
+        function updateAssetCounts() {
+            // Update environment counts
+            document.querySelectorAll('.tree-label.environment').forEach(env => {
+                const envName = env.dataset.environment;
+                const assetCount = env.querySelectorAll('.tree-label.asset').length;
+                const subtitle = env.querySelector('.tree-subtitle');
+                if (subtitle) {
+                    subtitle.textContent = `${assetCount} assets`;
+                }
+                const stats = env.querySelector('.tree-stats');
+                if (stats) {
+                    stats.textContent = assetCount;
+                }
+            });
+            
+            // Update category counts
+            document.querySelectorAll('.tree-label.category').forEach(category => {
+                const categoryAssets = category.closest('.tree-item').querySelectorAll('.tree-label.asset').length;
+                const subtitle = category.querySelector('.tree-subtitle');
+                if (subtitle) {
+                    subtitle.textContent = `${categoryAssets} assets`;
+                }
+                const stats = category.querySelector('.tree-stats');
+                if (stats) {
+                    stats.textContent = categoryAssets;
+                }
+            });
         }
         
         function showTab(tabName) {
@@ -1503,7 +1891,6 @@
             
             document.getElementById('editAssetId').value = asset.id;
             document.getElementById('editEnvironment').value = asset.environment;
-            document.getElementById('editCisGroup').value = asset.cisGroup;
             document.getElementById('editAssetType').value = asset.type;
             document.getElementById('editAssetName').value = asset.name;
             document.getElementById('editPhysicalLocation').value = asset.location;
@@ -1512,7 +1899,27 @@
             document.getElementById('editDescription').value = asset.description || '';
             document.getElementById('editAircraftIdentical').checked = asset.aircraftIdentical || false;
             
+            // Populate attribute checkboxes
+            populateEditAttributeCheckboxes(asset.attributes || []);
+            
             document.getElementById('editModal').style.display = 'block';
+        }
+        
+        function populateEditAttributeCheckboxes(selectedAttributes) {
+            const container = document.getElementById('editAttributeCheckboxes');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            attributes.forEach(attr => {
+                const div = document.createElement('div');
+                div.className = 'checkbox-item';
+                const isChecked = selectedAttributes.includes(attr);
+                div.innerHTML = `
+                    <input type="checkbox" id="edit_attr_${attr.replace(/\s+/g, '_')}" value="${attr}" ${isChecked ? 'checked' : ''}>
+                    <label for="edit_attr_${attr.replace(/\s+/g, '_')}">${attr}</label>
+                `;
+                container.appendChild(div);
+            });
         }
         
         function closeModal() {
@@ -1537,31 +1944,37 @@
                 return;
             }
             
-            const html = assets.map(asset => `
-                <div class="asset-card" onclick="openEditModal('${asset.id}')">
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <div class="asset-id-badge">${asset.id}</div>
-                        <div class="asset-badge">${asset.type}</div>
-                        <div class="environment-badge">${asset.environment}</div>
-                        ${asset.aircraftIdentical ? '<div class="asset-badge" style="background: #dc2626; color: white;">Aircraft Identical</div>' : ''}
-                    </div>
-                    <h4 style="margin: 0 0 5px 0; color: #2d3748;">${asset.name}</h4>
-                    <div style="font-size: 14px; color: #4a5568; line-height: 1.5;">
-                        <strong>Environment:</strong> ${asset.environment}<br>
-                        <strong>CIS Group:</strong> ${asset.cisGroup}<br>
-                        <strong>Location:</strong> ${asset.location}<br>
-                        ${asset.ipAddress ? `<strong>IP:</strong> ${asset.ipAddress}<br>` : ''}
-                        ${asset.os ? `<strong>OS:</strong> ${asset.os}<br>` : ''}
-                        ${asset.description ? `<strong>Description:</strong> ${asset.description}<br>` : ''}
-                    </div>
-                    <div class="timestamp-section">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span><i class="fas fa-calendar-plus"></i> <strong>Created:</strong> ${formatTimestamp(asset.createdAt)}</span>
-                            <span><i class="fas fa-calendar-check"></i> <strong>Updated:</strong> ${formatTimestamp(asset.updatedAt)}</span>
+            const html = assets.map(asset => {
+                const attributeBadges = asset.attributes ? asset.attributes.map(attr => 
+                    `<span class="attribute-badge">${attr}</span>`
+                ).join('') : '';
+                
+                return `
+                    <div class="asset-card" onclick="openEditModal('${asset.id}')">
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <div class="asset-id-badge">${asset.id}</div>
+                            <div class="asset-badge">${asset.type}</div>
+                            <div class="environment-badge">${asset.environment}</div>
+                            ${asset.aircraftIdentical ? '<div class="asset-badge" style="background: #dc2626; color: white;">Aircraft Identical</div>' : ''}
+                        </div>
+                        <h4 style="margin: 0 0 5px 0; color: #2d3748;">${asset.name}</h4>
+                        <div style="font-size: 14px; color: #4a5568; line-height: 1.5;">
+                            <strong>Environment:</strong> ${asset.environment}<br>
+                            <strong>Location:</strong> ${asset.location}<br>
+                            ${asset.ipAddress ? `<strong>IP:</strong> ${asset.ipAddress}<br>` : ''}
+                            ${asset.os ? `<strong>OS:</strong> ${asset.os}<br>` : ''}
+                            ${attributeBadges ? `<strong>Attributes:</strong> ${attributeBadges}<br>` : ''}
+                            ${asset.description ? `<strong>Description:</strong> ${asset.description}<br>` : ''}
+                        </div>
+                        <div class="timestamp-section">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span><i class="fas fa-calendar-plus"></i> <strong>Created:</strong> ${formatTimestamp(asset.createdAt)}</span>
+                                <span><i class="fas fa-calendar-check"></i> <strong>Updated:</strong> ${formatTimestamp(asset.updatedAt)}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
             
             container.innerHTML = html;
         }
@@ -1573,7 +1986,7 @@
                 asset.description?.toLowerCase().includes(searchTerm) ||
                 asset.location.toLowerCase().includes(searchTerm) ||
                 asset.environment.toLowerCase().includes(searchTerm) ||
-                asset.cisGroup.toLowerCase().includes(searchTerm)
+                (asset.attributes && asset.attributes.some(attr => attr.toLowerCase().includes(searchTerm)))
             );
             renderAssetList(filteredAssets);
         }
@@ -1685,6 +2098,27 @@
                         select.appendChild(option);
                     });
                 }
+            });
+        }
+        
+        function updateAttributeCheckboxes() {
+            const container = document.getElementById('attributeCheckboxes');
+            if (!container) {
+                console.error('Attribute checkboxes container not found');
+                return;
+            }
+            
+            container.innerHTML = '';
+            console.log('Loading attributes:', attributes);
+            
+            attributes.forEach(attr => {
+                const div = document.createElement('div');
+                div.className = 'checkbox-item';
+                div.innerHTML = `
+                    <input type="checkbox" id="attr_${attr.replace(/\s+/g, '_')}" value="${attr}">
+                    <label for="attr_${attr.replace(/\s+/g, '_')}">${attr}</label>
+                `;
+                container.appendChild(div);
             });
         }
         

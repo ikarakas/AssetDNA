@@ -1,0 +1,2138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AssetDNA - BOM Tracking System</title>
+    <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .navbar-brand { font-weight: bold; }
+        .main-container { margin-top: 20px; }
+        .asset-tree { 
+            border: 1px solid #dee2e6; 
+            border-radius: 5px; 
+            padding: 10px; 
+            min-height: 500px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .tabulator { font-size: 14px; }
+        /* Improve tree controls visibility */
+        .tabulator-tree-expand {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 1px solid #333;
+            border-radius: 2px;
+            background: #fff;
+            text-align: center;
+            line-height: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        .tabulator-tree-expand:hover {
+            background: #e7f3ff;
+            border-color: #0066cc;
+        }
+        .tabulator-tree-expand.open::after {
+            content: "−";
+        }
+        .tabulator-tree-expand.closed::after {
+            content: "+";
+        }
+        /* Custom tree expand icons */
+        .tree-expand-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            text-align: center;
+            background: #f0f0f0;
+            border: 1px solid #999;
+            border-radius: 3px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            margin-right: 8px;
+            transition: all 0.2s;
+        }
+        .tree-expand-icon:hover {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+        /* Make hierarchy lines clearer */
+        .tabulator-tree-branch {
+            border-left: 2px dotted #999;
+        }
+        .tabulator-row.tabulator-tree-level-1 .tabulator-cell[tabulator-field="name"] {
+            padding-left: 30px !important;
+        }
+        .tabulator-row.tabulator-tree-level-2 .tabulator-cell[tabulator-field="name"] {
+            padding-left: 55px !important;
+        }
+        .tabulator-row.tabulator-tree-level-3 .tabulator-cell[tabulator-field="name"] {
+            padding-left: 80px !important;
+        }
+        .tree-item { 
+            cursor: pointer; 
+            padding: 5px;
+            user-select: none;
+            border-radius: 3px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+        }
+        .tree-item:hover { 
+            background: #f8f9fa; 
+        }
+        .tree-item.selected { 
+            background: #e7f3ff; 
+            font-weight: bold;
+        }
+        .tree-item.dragging { 
+            opacity: 0.5;
+            cursor: grabbing !important;
+        }
+        .tree-item.drag-over { 
+            background: #d4edda !important;
+            border: 2px dashed #28a745;
+        }
+        .tree-expand {
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 12px;
+            width: 15px;
+            display: inline-block;
+        }
+        .tree-icon {
+            margin-right: 5px;
+            font-size: 16px;
+        }
+        .asset-name {
+            flex: 1;
+            cursor: pointer;
+        }
+        .asset-name.draggable {
+            cursor: move;
+        }
+        .asset-name.draggable:hover {
+            cursor: grab;
+        }
+        /* Modal styles */
+        .edit-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .edit-modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 50%;
+            max-width: 600px;
+            border-radius: 5px;
+        }
+        .btn-toolbar { margin-bottom: 15px; }
+        .bom-badge { 
+            background: #28a745; 
+            color: white; 
+            padding: 2px 6px; 
+            border-radius: 3px;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+        .metadata-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            padding: 5px;
+            background: #f8f9fa;
+            border-radius: 3px;
+        }
+        .metadata-key {
+            font-weight: bold;
+            margin-right: 10px;
+            min-width: 100px;
+        }
+        .metadata-value {
+            flex: 1;
+            margin-right: 10px;
+        }
+        .metadata-actions {
+            display: flex;
+            gap: 5px;
+        }
+        #metadata-container {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-diagram-3"></i> AssetDNA
+            </a>
+            <div class="navbar-nav ms-auto d-flex align-items-center">
+                <span class="text-light me-3">
+                    <i class="bi bi-tag"></i> <span id="app-version">Loading...</span>
+                </span>
+                <span class="text-light me-3">
+                    <i class="bi bi-clock"></i> Uptime: <span id="app-uptime">Loading...</span>
+                </span>
+                <a class="nav-link" href="/docs" target="_blank">
+                    <i class="bi bi-book"></i> API Docs
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Move/Copy Dialog -->
+    <div id="moveCopyModal" class="modal fade" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Move or Copy Asset</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="moveCopyMessage"></p>
+                    <div class="alert alert-info">
+                        <strong>Move:</strong> Relocates the asset to the new location<br>
+                        <strong>Copy:</strong> Creates a duplicate of the asset and all its children at the new location
+                        <br><br>
+                        <small><strong>Note:</strong> BOMs (Bill of Materials) are NOT copied. Each asset instance maintains its own independent BOM history.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="performAssetMove()">
+                        <i class="bi bi-arrow-right-circle"></i> Move
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="performAssetCopy()">
+                        <i class="bi bi-files"></i> Copy
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Context Menu for Tree Nodes -->
+    <div id="tree-context-menu" class="dropdown-menu" style="display: none; position: absolute; z-index: 1050;">
+        <a class="dropdown-item" href="#" onclick="expandAllChildren(); return false;">
+            <i class="bi bi-chevron-double-down"></i> Expand All Children
+        </a>
+        <a class="dropdown-item" href="#" onclick="collapseAllChildren(); return false;">
+            <i class="bi bi-chevron-double-up"></i> Collapse All Children
+        </a>
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item" href="#" onclick="expandAllTree(); return false;">
+            <i class="bi bi-arrows-expand"></i> Expand All
+        </a>
+        <a class="dropdown-item" href="#" onclick="collapseAllTree(); return false;">
+            <i class="bi bi-arrows-collapse"></i> Collapse All
+        </a>
+    </div>
+    
+    <!-- Main Container -->
+    <div class="container-fluid main-container">
+        <div class="row">
+            <!-- Left Panel - Asset Tree -->
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Asset Hierarchy</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshTree()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div id="asset-tree" class="asset-tree"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Tabular Editor -->
+            <div class="col-md-9">
+                <div class="card">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs">
+                            <li class="nav-item">
+                                <a class="nav-link active" data-bs-toggle="tab" href="#assets-tab">Assets</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#bom-tab">BOM History</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#import-export-tab">Import/Export</a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div class="tab-content">
+                            <!-- Assets Tab -->
+                            <div class="tab-pane fade show active" id="assets-tab">
+                                <div class="btn-toolbar">
+                                    <div class="btn-group me-2">
+                                        <button class="btn btn-primary" onclick="addAsset()">
+                                            <i class="bi bi-plus"></i> Add Asset
+                                        </button>
+                                    </div>
+                                    <div class="btn-group me-2" id="edit-btn-group">
+                                        <button class="btn btn-success" id="edit-selected-btn" onclick="editSelectedAsset()" disabled>
+                                            <i class="bi bi-pencil"></i> Edit Selected
+                                        </button>
+                                    </div>
+                                    <div class="btn-group me-2">
+                                        <button class="btn btn-info" id="bom-history-btn" onclick="viewBOMHistory()" disabled>
+                                            <i class="bi bi-clock-history"></i> BOM History
+                                        </button>
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-outline-danger" onclick="deleteSelected()">
+                                            <i class="bi bi-trash"></i> Delete Selected
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="asset-table"></div>
+                            </div>
+
+                            <!-- BOM History Tab -->
+                            <div class="tab-pane fade" id="bom-tab">
+                                <div id="bom-asset-info" style="display: none;">
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <h5 class="card-title" id="bom-asset-name"></h5>
+                                            <p class="card-text">
+                                                <strong>Type:</strong> <span id="bom-asset-type"></span><br>
+                                                <strong>URN:</strong> <span id="bom-asset-urn"></span><br>
+                                                <strong>Status:</strong> <span id="bom-asset-status"></span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="bom-no-selection" class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i> Select an asset to view its BOM history
+                                </div>
+                                <div id="bom-history"></div>
+                            </div>
+
+                            <!-- Import/Export Tab -->
+                            <div class="tab-pane fade" id="import-export-tab">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h5>Import Assets</h5>
+                                        <div class="mb-3">
+                                            <label class="form-label">Select Format:</label>
+                                            <select class="form-select" id="import-format">
+                                                <option value="csv">CSV</option>
+                                                <option value="json">JSON</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <input type="file" class="form-control" id="import-file" accept=".csv,.json">
+                                        </div>
+                                        <button class="btn btn-primary" onclick="importAssets()">
+                                            <i class="bi bi-upload"></i> Import
+                                        </button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h5>Export Assets</h5>
+                                        <div class="mb-3">
+                                            <label class="form-label">Select Format:</label>
+                                            <select class="form-select" id="export-format">
+                                                <option value="csv">CSV</option>
+                                                <option value="json">JSON</option>
+                                                <option value="xml">XML</option>
+                                                <option value="excel">Excel</option>
+                                            </select>
+                                        </div>
+                                        <button class="btn btn-success" onclick="exportAssets()">
+                                            <i class="bi bi-download"></i> Export
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Asset Modal -->
+    <div id="editModal" class="modal fade" tabindex="-1" aria-labelledby="editModalLabel">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Asset</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editForm" onsubmit="saveAssetEditForm(event)">
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" id="edit-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Asset Type</label>
+                            <select class="form-select" id="edit-asset-type" required>
+                                <!-- Will be populated with asset types -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="edit-description" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" id="edit-status">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="deprecated">Deprecated</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Version</label>
+                            <input type="text" class="form-control" id="edit-version">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">External ID</label>
+                            <input type="text" class="form-control" id="edit-external-id">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Metadata</label>
+                            <div id="metadata-container" class="border rounded p-2">
+                                <div id="metadata-list"></div>
+                                <div class="mt-2">
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" class="form-control" id="new-metadata-key" placeholder="Key">
+                                        <input type="text" class="form-control" id="new-metadata-value" placeholder="Value">
+                                        <button class="btn btn-outline-success" type="button" onclick="addMetadata()">
+                                            <i class="bi bi-plus"></i> Add
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+    <script>
+        const API_BASE = '/api/v1';
+        let assetTable = null;
+        let assetTypes = [];
+        let selectedAssetId = null;
+
+        // Load system info
+        async function loadSystemInfo() {
+            try {
+                const response = await fetch(`${API_BASE}/system/info`);
+                const info = await response.json();
+                
+                // Update version
+                const versionEl = document.getElementById('app-version');
+                if (versionEl) {
+                    versionEl.textContent = info.version;
+                }
+                
+                // Update uptime
+                const uptimeEl = document.getElementById('app-uptime');
+                if (uptimeEl) {
+                    uptimeEl.textContent = info.uptime;
+                }
+            } catch (error) {
+                console.error('Error loading system info:', error);
+                document.getElementById('app-version').textContent = 'Unknown';
+                document.getElementById('app-uptime').textContent = 'Unknown';
+            }
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await loadAssetTypes();
+                await loadAssetTree();
+                initAssetTable();
+                
+                // Load system info
+                loadSystemInfo();
+                
+                // Update system info every 30 seconds
+                setInterval(loadSystemInfo, 30000);
+                
+                // Add keyboard shortcuts for edit modal
+                document.getElementById('editModal').addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        const modal = bootstrap.Modal.getInstance(this);
+                        if (modal) {
+                            modal.hide();
+                            // Don't refresh on Escape - user is canceling
+                        }
+                    }
+                });
+                
+                // Add keyboard shortcuts for metadata inputs
+                document.getElementById('new-metadata-key').addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        document.getElementById('new-metadata-value').focus();
+                    }
+                });
+                
+                document.getElementById('new-metadata-value').addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addMetadata();
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                alert('Failed to initialize application. Please refresh the page.');
+            }
+        });
+
+        // Load asset types
+        async function loadAssetTypes() {
+            const response = await fetch(`${API_BASE}/assets/types`);
+            assetTypes = await response.json();
+        }
+
+        // Load asset tree
+        async function loadAssetTree() {
+            const response = await fetch(`${API_BASE}/assets/tree`);
+            const tree = await response.json();
+            cachedTreeData = tree; // Cache the tree data
+            globalTreeData = tree; // Store globally for access
+            renderTree(tree);
+            
+            // Also update the table to stay in sync
+            if (assetTable) {
+                // Convert tree data to table format  
+                function convertTreeToTableData(nodes, parentName = null) {
+                    // Sort nodes alphabetically, but keep Uncategorized for last
+                    const sortedNodes = [...nodes].sort((a, b) => {
+                        // If one is Uncategorized, it goes last
+                        if (a.name && a.name.toLowerCase() === 'uncategorized') return 1;
+                        if (b.name && b.name.toLowerCase() === 'uncategorized') return -1;
+                        // Otherwise sort alphabetically
+                        return (a.name || '').localeCompare(b.name || '');
+                    });
+                    
+                    let tableData = [];
+                    for (let node of sortedNodes) {
+                        const tableNode = {
+                            ...node,
+                            parent_name: parentName,
+                            _children: node.children && node.children.length > 0 ? 
+                                      convertTreeToTableData(node.children, node.name) : undefined
+                        };
+                        tableData.push(tableNode);
+                    }
+                    return tableData;
+                }
+                
+                const tableData = convertTreeToTableData(tree);
+                assetTable.setData(tableData);
+            }
+        }
+
+        // Drag and drop state
+        let draggedAsset = null;
+        let dragOriginalParent = null;
+        
+        // Track expanded/collapsed state
+        let expandedNodes = new Set();
+        
+        // Store tree data globally
+        let globalTreeData = [];
+        let contextMenuTargetNode = null;
+        
+        // Expand all children of a node
+        function expandAllChildren(nodeId = null) {
+            hideContextMenu();
+            if (!nodeId && contextMenuTargetNode) {
+                nodeId = contextMenuTargetNode.id;
+            }
+            
+            function expandNode(node) {
+                expandedNodes.add(String(node.id));
+                if (node.children) {
+                    node.children.forEach(child => expandNode(child));
+                }
+            }
+            
+            // Find the node and expand it and all children
+            function findAndExpand(nodes) {
+                for (let node of nodes) {
+                    if (nodeId && node.id === nodeId) {
+                        expandNode(node);
+                        return true;
+                    }
+                    if (node.children && findAndExpand(node.children)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            if (nodeId) {
+                findAndExpand(globalTreeData);
+            }
+            renderTree(globalTreeData);
+        }
+        
+        // Collapse all children of a node
+        function collapseAllChildren(nodeId = null) {
+            hideContextMenu();
+            if (!nodeId && contextMenuTargetNode) {
+                nodeId = contextMenuTargetNode.id;
+            }
+            
+            function collapseNode(node) {
+                expandedNodes.delete(String(node.id));
+                if (node.children) {
+                    node.children.forEach(child => collapseNode(child));
+                }
+            }
+            
+            // Find the node and collapse it and all children
+            function findAndCollapse(nodes) {
+                for (let node of nodes) {
+                    if (nodeId && node.id === nodeId) {
+                        collapseNode(node);
+                        return true;
+                    }
+                    if (node.children && findAndCollapse(node.children)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            if (nodeId) {
+                findAndCollapse(globalTreeData);
+            }
+            renderTree(globalTreeData);
+        }
+        
+        // Expand entire tree
+        function expandAllTree() {
+            hideContextMenu();
+            function expandAll(nodes) {
+                nodes.forEach(node => {
+                    expandedNodes.add(String(node.id));
+                    if (node.children) {
+                        expandAll(node.children);
+                    }
+                });
+            }
+            expandAll(globalTreeData);
+            renderTree(globalTreeData);
+        }
+        
+        // Collapse entire tree
+        function collapseAllTree() {
+            hideContextMenu();
+            expandedNodes.clear();
+            renderTree(globalTreeData);
+        }
+        
+        // Hide context menu
+        function hideContextMenu() {
+            const menu = document.getElementById('tree-context-menu');
+            if (menu) {
+                menu.style.display = 'none';
+            }
+        }
+        
+        // Render tree with drag-and-drop and expand/collapse
+        function renderTree(nodes, container = document.getElementById('asset-tree'), level = 0, isRoot = true) {
+            if (isRoot) {
+                container.innerHTML = '';
+                globalTreeData = nodes; // Store tree data globally
+                // Initialize expanded nodes on first render only
+                if (expandedNodes.size === 0) {
+                    nodes.forEach(node => {
+                        if (node.children && node.children.length > 0) {
+                            expandedNodes.add(String(node.id));
+                        }
+                    });
+                }
+            }
+            
+            nodes.forEach(node => {
+                const itemWrapper = document.createElement('div');
+                itemWrapper.style.paddingLeft = `${level * 20}px`;
+                
+                const item = document.createElement('div');
+                item.className = 'tree-item';
+                item.dataset.assetId = node.id;
+                item.dataset.assetName = node.name;
+                item.dataset.parentId = node.parent_id || '';
+                
+                const hasChildren = node.children && node.children.length > 0;
+                const isExpanded = expandedNodes.has(String(node.id));
+                
+                // Choose appropriate icons
+                let typeIcon = '📄'; // Default file icon
+                if (node.asset_type) {
+                    const typeName = node.asset_type.name;
+                    if (typeName.includes('Domain')) typeIcon = '🌐';
+                    else if (typeName.includes('System')) typeIcon = '💻';
+                    else if (typeName.includes('Subsystem')) typeIcon = '📦';
+                    else if (typeName.includes('Component')) typeIcon = '🔧';
+                    else if (typeName.includes('Hardware')) typeIcon = '🖥️';
+                    else if (typeName.includes('Software')) typeIcon = '💾';
+                    else if (typeName.includes('Firmware')) typeIcon = '⚙️';
+                }
+                
+                // Build the item HTML
+                let html = '';
+                
+                // Expand/collapse arrow - make it a proper button
+                if (hasChildren) {
+                    html += `<span class="tree-expand" style="cursor: pointer;">${isExpanded ? '▼' : '▶'}</span>`;
+                } else {
+                    html += '<span class="tree-expand"></span>';
+                }
+                
+                // Icon and name (draggable part)
+                html += `<span class="tree-icon">${typeIcon}</span>`;
+                const childrenCount = hasChildren ? ` (${node.children.length})` : '';
+                html += `<span class="asset-name draggable" draggable="true">${node.name}${childrenCount}</span>`;
+                
+                // BOM badge
+                if (node.bom_count > 0) {
+                    html += `<span class="bom-badge">BOM: ${node.bom_count}</span>`;
+                }
+                
+                item.innerHTML = html;
+                
+                // Add click handler to the expand/collapse arrow specifically
+                const expandArrow = item.querySelector('.tree-expand');
+                if (expandArrow && hasChildren) {
+                    expandArrow.onclick = (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        toggleNode(e, node.id);
+                    };
+                }
+                
+                // Click handler for selection
+                item.onclick = (e) => {
+                    if (!e.target.classList.contains('tree-expand')) {
+                        e.stopPropagation();
+                        selectAsset(node.id);
+                    }
+                };
+                
+                // Right-click handler for context menu
+                item.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Only show context menu for non-leaf nodes
+                    if (hasChildren) {
+                        contextMenuTargetNode = node;
+                        const menu = document.getElementById('tree-context-menu');
+                        menu.style.display = 'block';
+                        menu.style.left = e.pageX + 'px';
+                        menu.style.top = e.pageY + 'px';
+                        
+                        // Hide menu when clicking elsewhere
+                        document.addEventListener('click', hideContextMenu, { once: true });
+                    }
+                };
+                
+                // Drag start
+                item.ondragstart = (e) => {
+                    draggedAsset = node;
+                    dragOriginalParent = node.parent_id;
+                    e.dataTransfer.effectAllowed = 'move';
+                    item.style.opacity = '0.5';
+                    console.log(`Dragging: ${node.name}`);
+                };
+                
+                // Drag end
+                item.ondragend = (e) => {
+                    item.style.opacity = '';
+                    item.style.backgroundColor = '';
+                };
+                
+                // Drag over - allow drop
+                item.ondragover = (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    item.style.backgroundColor = '#e7f3ff';
+                };
+                
+                // Drag leave
+                item.ondragleave = (e) => {
+                    item.style.backgroundColor = '';
+                };
+                
+                // Drop handler
+                item.ondrop = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    item.style.backgroundColor = '';
+                    
+                    if (!draggedAsset || draggedAsset.id === node.id) {
+                        return; // Can't drop on itself
+                    }
+                    
+                    // Check if trying to drop parent on its own child
+                    if (isDescendant(node, draggedAsset)) {
+                        alert("Cannot move or copy a parent asset under its own child!");
+                        return;
+                    }
+                    
+                    // Store the drop target for move/copy operations
+                    window.dropTargetAsset = node;
+                    window.draggedAssetForOperation = draggedAsset;
+                    
+                    // Show move/copy dialog
+                    const message = `What would you like to do with "${draggedAsset.name}"?`;
+                    document.getElementById('moveCopyMessage').innerHTML = 
+                        `<strong>${message}</strong><br><br>` +
+                        `Source: ${draggedAsset.name}<br>` +
+                        `Destination: Under "${node.name}"`;
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('moveCopyModal'));
+                    modal.show();
+                };
+                
+                itemWrapper.appendChild(item);
+                container.appendChild(itemWrapper);
+                
+                // Create a container for children
+                if (hasChildren) {
+                    const childContainer = document.createElement('div');
+                    childContainer.className = 'tree-children';
+                    childContainer.dataset.parentId = node.id;
+                    childContainer.style.display = isExpanded ? 'block' : 'none';
+                    container.appendChild(childContainer);
+                    
+                    // Recursively render children
+                    renderTree(node.children, childContainer, level + 1, false);
+                }
+            });
+        }
+        
+        // Toggle node expansion
+        function toggleNode(event, nodeId) {
+            event.stopPropagation();
+            event.preventDefault();
+            
+            // Convert nodeId to string for consistent comparison
+            const nodeIdStr = String(nodeId);
+            
+            // Find the children container
+            const childContainer = document.querySelector(`.tree-children[data-parent-id="${nodeId}"]`);
+            if (!childContainer) return;
+            
+            // Find the expand arrow
+            const arrow = event.target;
+            
+            if (expandedNodes.has(nodeIdStr)) {
+                // Collapse
+                expandedNodes.delete(nodeIdStr);
+                childContainer.style.display = 'none';
+                arrow.textContent = '▶';
+            } else {
+                // Expand
+                expandedNodes.add(nodeIdStr);
+                childContainer.style.display = 'block';
+                arrow.textContent = '▼';
+            }
+        }
+        
+        // Store tree data globally
+        let cachedTreeData = null;
+        
+        // Render tree from cached data
+        function renderTreeFromCache() {
+            if (cachedTreeData) {
+                renderTree(cachedTreeData);
+            }
+        }
+        
+        // Check if potentialChild is a descendant of potentialParent
+        function isDescendant(potentialChild, potentialParent) {
+            if (!potentialParent.children) return false;
+            
+            for (let child of potentialParent.children) {
+                if (child.id === potentialChild.id) return true;
+                if (isDescendant(potentialChild, child)) return true;
+            }
+            return false;
+        }
+        
+        // Perform asset move operation
+        async function performAssetMove() {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('moveCopyModal'));
+            modal.hide();
+            
+            if (!window.draggedAssetForOperation || !window.dropTargetAsset) {
+                alert('Error: Missing asset information for move operation');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/assets/${window.draggedAssetForOperation.id}/move`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        new_parent_id: window.dropTargetAsset.id
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Asset moved successfully:', result.message);
+                    // Load tree which will also update table
+                    await loadAssetTree();
+                } else {
+                    const error = await response.text();
+                    alert(`Failed to move asset: ${error}`);
+                }
+            } catch (error) {
+                alert(`Error moving asset: ${error}`);
+            }
+            
+            // Clear the stored references
+            window.draggedAssetForOperation = null;
+            window.dropTargetAsset = null;
+        }
+        
+        // Perform asset copy operation (deep copy with children)
+        async function performAssetCopy() {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('moveCopyModal'));
+            modal.hide();
+            
+            if (!window.draggedAssetForOperation || !window.dropTargetAsset) {
+                alert('Error: Missing asset information for copy operation');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/assets/${window.draggedAssetForOperation.id}/copy`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        new_parent_id: window.dropTargetAsset.id
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Asset copied successfully:', result.message);
+                    // Load tree which will also update table
+                    await loadAssetTree();
+                    // Select the newly copied asset
+                    selectAsset(result.id);
+                } else {
+                    const error = await response.text();
+                    alert(`Failed to copy asset: ${error}`);
+                }
+            } catch (error) {
+                alert(`Error copying asset: ${error}`);
+            }
+            
+            // Clear the stored references
+            window.draggedAssetForOperation = null;
+            window.dropTargetAsset = null;
+        }
+        
+        // Legacy move function (kept for backward compatibility if needed)
+        async function moveAsset(assetId, newParentId) {
+            try {
+                const response = await fetch(`${API_BASE}/assets/${assetId}/move`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        new_parent_id: newParentId
+                    })
+                });
+                
+                if (response.ok) {
+                    console.log('Asset moved successfully');
+                    // Load tree which will also update table
+                    await loadAssetTree();
+                } else {
+                    const error = await response.text();
+                    alert(`Failed to move asset: ${error}`);
+                }
+            } catch (error) {
+                alert(`Error moving asset: ${error}`);
+            }
+        }
+
+        // Helper function to get tree level
+        function getTreeLevel(row) {
+            let level = 0;
+            let parent = row.getTreeParent();
+            while (parent) {
+                level++;
+                parent = parent.getTreeParent();
+            }
+            return level;
+        }
+        
+        // Initialize asset table
+        function initAssetTable() {
+            assetTable = new Tabulator("#asset-table", {
+                height: "500px",
+                layout: "fitColumns",
+                responsiveLayout: "hide",
+                addRowPos: "top",
+                history: true,
+                pagination: "local",
+                paginationSize: 20,
+                movableColumns: true,
+                resizableRows: true,
+                selectable: 1,  // Only allow single selection
+                dataTree: true,
+                dataTreeStartExpanded: true,
+                dataTreeChildField: "_children",
+                dataTreeChildIndent: 30,
+                dataTreeElementColumn: "name",
+                dataTreeBranchElement: '<span style="display: inline-block; width: 24px; text-align: center; color: #666;">├─</span>',
+                dataTreeExpandElement: '<button class="btn btn-sm btn-outline-secondary" style="width: 24px; height: 24px; padding: 0; line-height: 1; margin-right: 5px;">+</button>',
+                dataTreeCollapseElement: '<button class="btn btn-sm btn-outline-secondary" style="width: 24px; height: 24px; padding: 0; line-height: 1; margin-right: 5px;">−</button>',
+                columns: [
+                    {title: "", width: 80, hozAlign: "center", formatter: function(cell) {
+                        const id = cell.getRow().getData().id;
+                        if (id) {
+                            return `<button class="btn btn-sm btn-primary" onclick="editAsset('${id}')">Edit</button>`;
+                        }
+                        return '';
+                    }},
+                    {title: "Name", field: "name", responsive: 0, width: 400,
+                     formatter: function(cell, formatterParams, onRendered) {
+                         const value = cell.getValue();
+                         const data = cell.getRow().getData();
+                         
+                         // Get appropriate icon
+                         let typeIcon = '📄';
+                         if (data.asset_type) {
+                             const typeName = data.asset_type.name;
+                             if (typeName.includes('Domain')) typeIcon = '🌐';
+                             else if (typeName.includes('System')) typeIcon = '💻';
+                             else if (typeName.includes('Subsystem')) typeIcon = '📦';
+                             else if (typeName.includes('Component')) typeIcon = '🔧';
+                             else if (typeName.includes('Hardware')) typeIcon = '🖥️';
+                             else if (typeName.includes('Software')) typeIcon = '💾';
+                             else if (typeName.includes('Firmware')) typeIcon = '⚙️';
+                         }
+                         
+                         // Add children count for non-leaf nodes
+                         let displayName = value;
+                         if (data._children && data._children.length > 0) {
+                             displayName = `${value} (${data._children.length})`;
+                         }
+                         
+                         return `<span style="margin-right: 5px; font-size: 16px;">${typeIcon}</span><strong style="font-size: 14px;">${displayName}</strong>`;
+                     }
+                    },
+                    {title: "Type", field: "asset_type", width: 200,
+                     formatter: function(cell) {
+                         const type = cell.getValue();
+                         return type ? type.name : '';
+                     }
+                    },
+                    {title: "Parent", field: "parent_name", width: 200},
+                    {title: "Description", field: "description"},
+                    {title: "Status", field: "status", width: 120,
+                     formatter: function(cell) {
+                         const status = cell.getValue();
+                         let color = 'secondary';
+                         if (status === 'active') color = 'success';
+                         else if (status === 'inactive') color = 'warning';
+                         else if (status === 'deprecated') color = 'danger';
+                         return `<span class="badge bg-${color}">${status}</span>`;
+                     }},
+                    {title: "Version", field: "version", width: 100},
+                    {title: "External ID", field: "external_id", width: 150},
+                    {title: "Metadata", field: "properties", width: 150,
+                     formatter: function(cell) {
+                         const props = cell.getValue();
+                         if (props && Object.keys(props).length > 0) {
+                             const count = Object.keys(props).length;
+                             return `<span class="badge bg-info">${count} properties</span>`;
+                         }
+                         return '<span class="text-muted">-</span>';
+                     }},
+                    {title: "BOMs", field: "bom_count", width: 100,
+                     formatter: function(cell) {
+                         const count = cell.getValue() || 0;
+                         if (count > 0) {
+                             return `<span class="badge bg-success">📦 ${count}</span>`;
+                         }
+                         return '<span class="text-muted">-</span>';
+                     }},
+                    {title: "URN", field: "urn", responsive: 0}
+                ],
+            });
+
+            // Add table event handlers after initialization
+            assetTable.on("rowClick", function(e, row){
+                console.log("Row clicked:", row.getData().name);
+                currentSelectedAsset = row.getData();
+                // Enable buttons
+                const editBtn = document.getElementById('edit-selected-btn');
+                if (editBtn) {
+                    editBtn.disabled = false;
+                    console.log('Edit button enabled for:', currentSelectedAsset.name);
+                }
+                const bomBtn = document.getElementById('bom-history-btn');
+                if (bomBtn) {
+                    bomBtn.disabled = false;
+                }
+                
+                // Update BOM History if that tab is active
+                const bomTab = document.querySelector('#bom-tab');
+                if (bomTab && bomTab.classList.contains('show') && bomTab.classList.contains('active')) {
+                    loadBOMHistory(currentSelectedAsset.id);
+                }
+            });
+            
+            assetTable.on("rowDblClick", function(e, row){
+                console.log("Row double-clicked:", row.getData().name);
+                const assetId = row.getData().id;
+                if (assetId) {
+                    editAsset(assetId);
+                }
+            });
+            
+            assetTable.on("rowSelected", function(row){
+                console.log("Row selected:", row.getData().name);
+                currentSelectedAsset = row.getData();
+                const editBtn = document.getElementById('edit-selected-btn');
+                if (editBtn) {
+                    editBtn.disabled = false;
+                }
+                const bomBtn = document.getElementById('bom-history-btn');
+                if (bomBtn) {
+                    bomBtn.disabled = false;
+                }
+                
+                // Update BOM History if that tab is active
+                const bomTab = document.querySelector('#bom-tab');
+                if (bomTab && bomTab.classList.contains('show') && bomTab.classList.contains('active')) {
+                    loadBOMHistory(currentSelectedAsset.id);
+                }
+            });
+            
+            assetTable.on("rowDeselected", function(row){
+                console.log("Row deselected");
+                currentSelectedAsset = null;
+                const editBtn = document.getElementById('edit-selected-btn');
+                if (editBtn) {
+                    editBtn.disabled = true;
+                }
+                const bomBtn = document.getElementById('bom-history-btn');
+                if (bomBtn) {
+                    bomBtn.disabled = true;
+                }
+            });
+
+            loadAssets();
+        }
+
+        // Load assets - now uses tree API for consistency
+        async function loadAssets() {
+            const response = await fetch(`${API_BASE}/assets/tree`);
+            const treeData = await response.json();
+            
+            // Store tree data globally for consistency
+            globalTreeData = treeData;
+            cachedTreeData = treeData;
+            
+            // Convert tree data to table format
+            function convertTreeToTableData(nodes, parentName = null) {
+                let tableData = [];
+                let uncategorizedData = [];
+                
+                // Sort nodes alphabetically, but keep Uncategorized for last
+                const sortedNodes = [...nodes].sort((a, b) => {
+                    // If one is Uncategorized, it goes last
+                    if (a.name && a.name.toLowerCase() === 'uncategorized') return 1;
+                    if (b.name && b.name.toLowerCase() === 'uncategorized') return -1;
+                    // Otherwise sort alphabetically
+                    return (a.name || '').localeCompare(b.name || '');
+                });
+                
+                for (let node of sortedNodes) {
+                    const tableNode = {
+                        ...node,
+                        parent_name: parentName,
+                        _children: node.children && node.children.length > 0 ? 
+                                  convertTreeToTableData(node.children, node.name) : undefined
+                    };
+                    tableData.push(tableNode);
+                }
+                
+                return tableData;
+            }
+            
+            const tableData = convertTreeToTableData(treeData);
+            assetTable.setData(tableData);
+            
+            // Also update the tree view
+            renderTree(treeData);
+        }
+
+        // Track currently selected asset
+        let currentSelectedAsset = null;
+        
+        // Add asset
+        async function addAsset() {
+            console.log('Adding new asset...');
+            
+            // Check if table is initialized
+            if (!assetTable) {
+                alert('Table not initialized. Please refresh the page.');
+                return;
+            }
+            
+            // Check if asset types are loaded
+            if (!assetTypes || assetTypes.length === 0) {
+                alert('Asset types not loaded. Please refresh the page.');
+                return;
+            }
+            
+            // Use the globally selected asset as parent
+            let parentId = null;
+            let parentName = "root level";
+            
+            if (currentSelectedAsset) {
+                parentId = currentSelectedAsset.id;
+                parentName = currentSelectedAsset.name;
+                
+                // Ask user to confirm parent
+                if (!confirm(`Add new asset as a child of "${parentName}"?\n\nClick OK to add as child, Cancel to add at root level.`)) {
+                    parentId = null;
+                    parentName = "root level";
+                }
+            }
+            
+            const newAsset = {
+                name: "New Asset " + new Date().toLocaleTimeString(),
+                asset_type_id: assetTypes[0].id,
+                status: "active",
+                parent_id: parentId,
+                description: "",
+                version: "1.0.0",
+                properties: {},  // Empty metadata
+                tags: []
+            };
+            
+            console.log(`Creating asset under ${parentName}:`, newAsset);
+            
+            try {
+                const response = await fetch(`${API_BASE}/assets`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newAsset)
+                });
+                
+                if (response.ok) {
+                    const createdAsset = await response.json();
+                    console.log('Asset created:', createdAsset);
+                    
+                    // Store the new asset ID to select it after reload
+                    const newAssetId = createdAsset.id;
+                    
+                    // Load tree which will also update table
+                    await loadAssetTree();
+                    
+                    // Select the newly created asset
+                    selectAsset(newAssetId);
+                    
+                    // Open edit dialog for the new asset
+                    setTimeout(() => {
+                        editAsset(newAssetId);
+                    }, 100);
+                    
+                    // Show success message
+                    const successMsg = parentId 
+                        ? `Asset created under "${parentName}"`
+                        : "Asset created at root level";
+                    console.log(successMsg);
+                } else {
+                    const errorText = await response.text();
+                    console.error('Failed to create asset:', errorText);
+                    alert(`Failed to create asset: ${errorText}`);
+                }
+            } catch (error) {
+                console.error('Error creating asset:', error);
+                alert(`Error creating asset: ${error}`);
+            }
+        }
+
+        // Save changes
+        async function saveChanges() {
+            const editedRows = new Set();
+            assetTable.getEditedCells().forEach(cell => {
+                editedRows.add(cell.getRow());
+            });
+            
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (const row of editedRows) {
+                const data = row.getData();
+                if (data.id) {
+                    // Update existing asset
+                    try {
+                        const response = await fetch(`${API_BASE}/assets/${data.id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                name: data.name,
+                                description: data.description,
+                                status: data.status,
+                                version: data.version,
+                                external_id: data.external_id,
+                                properties: data.properties || {},
+                                tags: data.tags || []
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                        }
+                    } catch (error) {
+                        errorCount++;
+                    }
+                }
+            }
+            
+            if (successCount > 0) {
+                alert(`${successCount} assets updated successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`);
+                await loadAssets();
+                await loadAssetTree();
+            } else if (errorCount > 0) {
+                alert(`Failed to update ${errorCount} assets`);
+            }
+        }
+
+        // Delete selected
+        async function deleteSelected() {
+            const selectedRows = assetTable.getSelectedRows();
+            if (selectedRows.length === 0) {
+                alert('No rows selected');
+                return;
+            }
+            
+            const asset = selectedRows[0].getData();
+            
+            // Check if asset has children
+            let hasChildren = false;
+            if (asset._children && asset._children.length > 0) {
+                hasChildren = true;
+            }
+            
+            let confirmMessage = `Delete "${asset.name}"?`;
+            if (hasChildren) {
+                confirmMessage = `"${asset.name}" has child assets.\n\nDo you want to delete this asset and ALL its children?\n\nThis action cannot be undone.`;
+            }
+            
+            if (confirm(confirmMessage)) {
+                try {
+                    // Use cascade=true to delete children if they exist
+                    const response = await fetch(`${API_BASE}/assets/${asset.id}?cascade=${hasChildren}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        console.log('Asset deleted successfully');
+                        // Refresh both tree and table
+                        await loadAssets();
+                        await loadAssetTree();
+                        currentSelectedAsset = null;
+                    } else {
+                        const error = await response.text();
+                        alert(`Failed to delete asset: ${error}`);
+                    }
+                } catch (error) {
+                    alert(`Error deleting asset: ${error}`);
+                }
+            }
+        }
+
+        // Select asset from tree
+        function selectAsset(assetId) {
+            selectedAssetId = assetId;
+            
+            // Update tree highlighting
+            document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+            
+            // Find and highlight the tree item
+            const treeItems = document.querySelectorAll('.tree-item');
+            treeItems.forEach(item => {
+                if (item.dataset.assetId === assetId) {
+                    item.classList.add('selected');
+                    
+                    // Ensure parent nodes are expanded to show this item
+                    let parent = item.parentElement;
+                    while (parent) {
+                        if (parent.classList.contains('tree-children')) {
+                            const parentId = parent.dataset.parentId;
+                            if (parentId) {
+                                expandedNodes.add(String(parentId));
+                                parent.style.display = 'block';
+                            }
+                        }
+                        parent = parent.parentElement;
+                    }
+                }
+            });
+            
+            // Find the asset data - first try table rows, then tree data
+            let foundAsset = null;
+            
+            // Helper function to find asset in tree data
+            function findAssetInTreeData(nodes) {
+                for (let node of nodes) {
+                    if (node.id === assetId) {
+                        return node;
+                    }
+                    if (node.children && node.children.length > 0) {
+                        const found = findAssetInTreeData(node.children);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+            
+            // First try to find in global tree data
+            foundAsset = findAssetInTreeData(globalTreeData);
+            
+            // If not found and table exists, try table rows
+            if (!foundAsset && assetTable) {
+                const rows = assetTable.getRows();
+                
+                // Recursive function to find asset in table rows
+                function findAssetInRows(rows) {
+                    for (let row of rows) {
+                        const data = row.getData();
+                        if (data.id === assetId) {
+                            return data;
+                        }
+                        // Check children rows
+                        const children = row.getTreeChildren();
+                        if (children && children.length > 0) {
+                            const found = findAssetInRows(children);
+                            if (found) return found;
+                        }
+                    }
+                    return null;
+                }
+                
+                foundAsset = findAssetInRows(rows);
+            }
+            
+            // Select the row in table if it exists
+            if (assetTable) {
+                // First deselect all
+                assetTable.deselectRow();
+                
+                // Function to expand parent rows up to the target
+                function expandParentsAndSelect(assetId) {
+                    const rows = assetTable.getRows();
+                    
+                    // First, find the path to the asset
+                    function findPath(rows, targetId, path = []) {
+                        for (let row of rows) {
+                            const currentPath = [...path, row];
+                            if (row.getData().id === targetId) {
+                                return currentPath;
+                            }
+                            const children = row.getTreeChildren();
+                            if (children && children.length > 0) {
+                                const found = findPath(children, targetId, currentPath);
+                                if (found) return found;
+                            }
+                        }
+                        return null;
+                    }
+                    
+                    const pathToAsset = findPath(rows, assetId);
+                    
+                    if (pathToAsset && pathToAsset.length > 0) {
+                        // Expand all parents in the path
+                        for (let i = 0; i < pathToAsset.length - 1; i++) {
+                            pathToAsset[i].treeExpand();
+                        }
+                        
+                        // Select and scroll to the target row
+                        const targetRow = pathToAsset[pathToAsset.length - 1];
+                        targetRow.select();
+                        
+                        // Use setTimeout to ensure expansion is complete before scrolling
+                        setTimeout(() => {
+                            try {
+                                targetRow.scrollTo();
+                            } catch (e) {
+                                console.log('Could not scroll to row:', e);
+                            }
+                        }, 100);
+                    }
+                }
+                
+                expandParentsAndSelect(assetId);
+            }
+            
+            // If we found the asset, update currentSelectedAsset
+            if (foundAsset) {
+                currentSelectedAsset = foundAsset;
+                // Enable buttons
+                document.getElementById('edit-selected-btn').disabled = false;
+                const bomBtn = document.getElementById('bom-history-btn');
+                if (bomBtn) bomBtn.disabled = false;
+            } else {
+                console.error('Asset not found:', assetId);
+            }
+            
+            // Check if BOM History tab is active and update it
+            const bomTab = document.querySelector('#bom-tab');
+            if (bomTab && bomTab.classList.contains('show') && bomTab.classList.contains('active')) {
+                if (currentSelectedAsset) {
+                    loadBOMHistory(currentSelectedAsset.id);
+                }
+            }
+        }
+        
+        // View BOM History for selected asset
+        function viewBOMHistory() {
+            if (!currentSelectedAsset) {
+                alert('Please select an asset first');
+                return;
+            }
+            
+            // Switch to BOM History tab
+            const bomTab = document.querySelector('a[href="#bom-tab"]');
+            const tab = new bootstrap.Tab(bomTab);
+            tab.show();
+            
+            // Load BOM history for the selected asset
+            loadBOMHistory(currentSelectedAsset.id);
+        }
+        
+        // Load BOM history for an asset
+        async function loadBOMHistory(assetId) {
+            const bomAssetInfo = document.getElementById('bom-asset-info');
+            const bomNoSelection = document.getElementById('bom-no-selection');
+            const bomHistory = document.getElementById('bom-history');
+            
+            if (!assetId || !currentSelectedAsset) {
+                bomAssetInfo.style.display = 'none';
+                bomNoSelection.style.display = 'block';
+                bomHistory.innerHTML = '';
+                return;
+            }
+            
+            // Show asset information
+            bomAssetInfo.style.display = 'block';
+            bomNoSelection.style.display = 'none';
+            
+            // Populate asset info
+            document.getElementById('bom-asset-name').textContent = currentSelectedAsset.name || 'Unknown';
+            document.getElementById('bom-asset-type').textContent = 
+                currentSelectedAsset.asset_type ? currentSelectedAsset.asset_type.name : 'Unknown';
+            document.getElementById('bom-asset-urn').textContent = currentSelectedAsset.urn || 'N/A';
+            
+            // Format status with badge
+            const status = currentSelectedAsset.status || 'unknown';
+            let statusColor = 'secondary';
+            if (status === 'active') statusColor = 'success';
+            else if (status === 'inactive') statusColor = 'warning';
+            else if (status === 'deprecated') statusColor = 'danger';
+            document.getElementById('bom-asset-status').innerHTML = 
+                `<span class="badge bg-${statusColor}">${status}</span>`;
+            
+            // Check if this is a leaf asset
+            const hasChildren = currentSelectedAsset._children && currentSelectedAsset._children.length > 0;
+            
+            if (hasChildren) {
+                // Show message that BOMs are only for leaf assets
+                bomHistory.innerHTML = `
+                    <div class="alert alert-warning">
+                        <h5><i class="bi bi-exclamation-triangle"></i> BOMs Not Available</h5>
+                        <p>Bill of Materials (BOMs) can only be uploaded for leaf-level assets (assets without children).</p>
+                        <p>This asset has ${currentSelectedAsset._children.length} child asset(s). Please select a leaf-level asset to manage BOMs.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            try {
+                // Load existing BOM history
+                const historyResponse = await fetch(`${API_BASE}/assets/${assetId}/bom/history`);
+                const bomHistories = await historyResponse.json();
+                
+                let historyHTML = '';
+                if (bomHistories && bomHistories.length > 0) {
+                    historyHTML = '<div class="list-group mb-3">';
+                    bomHistories.forEach(bom => {
+                        const bomDate = new Date(bom.date);
+                        const dateStr = bomDate.toLocaleDateString();
+                        const timeStr = bomDate.toLocaleTimeString();
+                        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        historyHTML += `
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">Version: ${bom.version}</h6>
+                                    <small>${dateStr} ${timeStr} (${timezone})</small>
+                                </div>
+                                <p class="mb-1">
+                                    <span class="badge bg-info">${bom.format}</span>
+                                    <span class="badge bg-secondary">${bom.total_components} components</span>
+                                </p>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewBOMDetails('${assetId}', '${bom.id}')">
+                                        <i class="bi bi-eye"></i> View
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBOM('${assetId}', '${bom.id}')">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    historyHTML += '</div>';
+                } else {
+                    historyHTML = '<div class="alert alert-info">No BOM history found for this asset.</div>';
+                }
+                
+                bomHistory.innerHTML = `
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6>Upload New BOM</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="bom-upload-form" onsubmit="uploadBOM(event)">
+                                <div class="mb-3">
+                                    <label class="form-label">BOM File (JSON)</label>
+                                    <input type="file" class="form-control" id="bom-file" accept=".json" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Version</label>
+                                    <input type="text" class="form-control" id="bom-version" placeholder="e.g., 1.0.0" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-select" id="bom-type">
+                                        <option value="SBOM">SBOM (Software)</option>
+                                        <option value="HBOM">HBOM (Hardware)</option>
+                                        <option value="OBOM">OBOM (Operational)</option>
+                                        <option value="MBOM">MBOM (Manufacturing)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-upload"></i> Upload BOM
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h6>BOM History</h6>
+                        </div>
+                        <div class="card-body">
+                            ${historyHTML}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                bomHistory.innerHTML = `
+                    <div class="alert alert-danger">
+                        Error loading BOM history: ${error}
+                    </div>
+                `;
+            }
+        }
+        
+        // Handle tab changes
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add tab change listener
+            document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tab => {
+                tab.addEventListener('shown.bs.tab', (e) => {
+                    if (e.target.getAttribute('href') === '#bom-tab' && selectedAssetId) {
+                        loadBOMHistory(selectedAssetId);
+                    }
+                });
+            });
+        });
+
+        // Track metadata for current edit
+        let currentMetadata = {};
+        
+        // Add metadata item
+        function addMetadata() {
+            const key = document.getElementById('new-metadata-key').value.trim();
+            const value = document.getElementById('new-metadata-value').value.trim();
+            
+            if (!key) {
+                alert('Please enter a key');
+                return;
+            }
+            
+            if (currentMetadata[key]) {
+                if (!confirm(`Key "${key}" already exists. Replace it?`)) {
+                    return;
+                }
+            }
+            
+            currentMetadata[key] = value;
+            renderMetadata();
+            
+            // Clear inputs
+            document.getElementById('new-metadata-key').value = '';
+            document.getElementById('new-metadata-value').value = '';
+        }
+        
+        // Edit metadata item
+        function editMetadataItem(key) {
+            const newValue = prompt(`Edit value for "${key}":`, currentMetadata[key]);
+            if (newValue !== null) {
+                currentMetadata[key] = newValue;
+                renderMetadata();
+            }
+        }
+        
+        // Delete metadata item
+        function deleteMetadataItem(key) {
+            if (confirm(`Delete metadata "${key}"?`)) {
+                delete currentMetadata[key];
+                renderMetadata();
+            }
+        }
+        
+        // Render metadata list
+        function renderMetadata() {
+            const container = document.getElementById('metadata-list');
+            container.innerHTML = '';
+            
+            Object.entries(currentMetadata).forEach(([key, value]) => {
+                const item = document.createElement('div');
+                item.className = 'metadata-item';
+                
+                // Create elements programmatically to avoid escaping issues
+                const keySpan = document.createElement('span');
+                keySpan.className = 'metadata-key';
+                keySpan.textContent = key + ':';
+                
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'metadata-value';
+                if (value) {
+                    valueSpan.textContent = value;
+                } else {
+                    valueSpan.innerHTML = '<em>empty</em>';
+                }
+                
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'metadata-actions';
+                
+                const editBtn = document.createElement('button');
+                editBtn.className = 'btn btn-sm btn-outline-primary';
+                editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
+                editBtn.onclick = () => editMetadataItem(key);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-sm btn-outline-danger';
+                deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+                deleteBtn.onclick = () => deleteMetadataItem(key);
+                
+                actionsDiv.appendChild(editBtn);
+                actionsDiv.appendChild(deleteBtn);
+                
+                item.appendChild(keySpan);
+                item.appendChild(valueSpan);
+                item.appendChild(actionsDiv);
+                
+                container.appendChild(item);
+            });
+            
+            if (Object.keys(currentMetadata).length === 0) {
+                container.innerHTML = '<small class="text-muted">No metadata defined</small>';
+            }
+        }
+        
+        // Edit selected asset
+        function editSelectedAsset() {
+            if (currentSelectedAsset && currentSelectedAsset.id) {
+                editAsset(currentSelectedAsset.id);
+            } else {
+                alert('Please select an asset to edit');
+            }
+        }
+        
+        // Edit asset in modal
+        let editingAssetId = null;
+        
+        async function editAsset(assetId) {
+            editingAssetId = assetId;
+            
+            // Find the asset - search recursively through tree structure
+            let assetData = null;
+            
+            function findAssetInTree(rows) {
+                for (let row of rows) {
+                    const data = row.getData();
+                    if (data.id === assetId) {
+                        return data;
+                    }
+                    // Check children
+                    if (data._children && data._children.length > 0) {
+                        const found = findAssetRecursive(data._children);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+            
+            function findAssetRecursive(nodes) {
+                for (let node of nodes) {
+                    if (node.id === assetId) {
+                        return node;
+                    }
+                    if (node._children && node._children.length > 0) {
+                        const found = findAssetRecursive(node._children);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+            
+            // Try to find in table rows first
+            const rows = assetTable.getRows();
+            assetData = findAssetInTree(rows);
+            
+            // If not found in rows, try current selected asset
+            if (!assetData && currentSelectedAsset && currentSelectedAsset.id === assetId) {
+                assetData = currentSelectedAsset;
+            }
+            
+            if (!assetData) {
+                console.error('Asset not found with ID:', assetId);
+                alert('Asset not found. Please refresh the page and try again.');
+                return;
+            }
+            
+            // Populate asset types dropdown
+            const assetTypeSelect = document.getElementById('edit-asset-type');
+            assetTypeSelect.innerHTML = '';
+            assetTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.id;
+                option.textContent = type.name;
+                assetTypeSelect.appendChild(option);
+            });
+            
+            // Populate the modal fields
+            document.getElementById('edit-name').value = assetData.name || '';
+            document.getElementById('edit-description').value = assetData.description || '';
+            document.getElementById('edit-status').value = assetData.status || 'active';
+            document.getElementById('edit-version').value = assetData.version || '';
+            document.getElementById('edit-external-id').value = assetData.external_id || '';
+            
+            // Set the asset type
+            if (assetData.asset_type && assetData.asset_type.id) {
+                document.getElementById('edit-asset-type').value = assetData.asset_type.id;
+            } else if (assetData.asset_type_id) {
+                document.getElementById('edit-asset-type').value = assetData.asset_type_id;
+            }
+            
+            // Load metadata (properties field)
+            currentMetadata = assetData.properties || {};
+            renderMetadata();
+            
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('editModal'));
+            modal.show();
+        }
+        
+        // Handle form submit with Enter key
+        function saveAssetEditForm(event) {
+            event.preventDefault();
+            saveAssetEdit();
+        }
+        
+        async function saveAssetEdit() {
+            if (!editingAssetId) return;
+            
+            const updateData = {
+                name: document.getElementById('edit-name').value,
+                asset_type_id: document.getElementById('edit-asset-type').value,
+                description: document.getElementById('edit-description').value || '',
+                status: document.getElementById('edit-status').value,
+                version: document.getElementById('edit-version').value || '',
+                external_id: document.getElementById('edit-external-id').value || null,
+                properties: currentMetadata || {}  // Ensure it's never undefined
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/assets/${editingAssetId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(updateData)
+                });
+                
+                if (response.ok) {
+                    // Store the ID to reselect after refresh
+                    const updatedAssetId = editingAssetId;
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+                    modal.hide();
+                    
+                    // Refresh data
+                    // Load tree which will also update table
+                    await loadAssetTree();
+                    
+                    // Reselect the updated asset
+                    selectAsset(updatedAssetId);
+                    
+                    console.log('Asset updated successfully');
+                } else {
+                    const error = await response.text();
+                    alert(`Failed to update asset: ${error}`);
+                }
+            } catch (error) {
+                alert(`Error updating asset: ${error}`);
+            }
+        }
+        
+        // Upload BOM
+        async function uploadBOM(event) {
+            event.preventDefault();
+            
+            if (!currentSelectedAsset) {
+                alert('No asset selected');
+                return;
+            }
+            
+            // Check if asset has children (only leaf nodes can have BOMs)
+            if (currentSelectedAsset._children && currentSelectedAsset._children.length > 0) {
+                alert('BOMs can only be uploaded for leaf-level assets (assets without children).\n\nThis asset has child assets.');
+                return;
+            }
+            
+            const fileInput = document.getElementById('bom-file');
+            const version = document.getElementById('bom-version').value;
+            const bomType = document.getElementById('bom-type').value;
+            
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('version', version);
+            formData.append('bom_type', bomType);
+            formData.append('source', 'Manual Upload');
+            
+            try {
+                console.log('Uploading BOM for asset:', currentSelectedAsset.id);
+                console.log('FormData contents:', {
+                    file: fileInput.files[0].name,
+                    version: version,
+                    bom_type: bomType,
+                    source: 'Manual Upload'
+                });
+                
+                const response = await fetch(`${API_BASE}/assets/${currentSelectedAsset.id}/bom/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(result.message);
+                    
+                    // Clear form
+                    document.getElementById('bom-upload-form').reset();
+                    
+                    // Reload BOM history
+                    loadBOMHistory(currentSelectedAsset.id);
+                } else {
+                    const errorText = await response.text();
+                    console.error('BOM upload failed:', errorText);
+                    
+                    // Try to parse as JSON for better error message
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        alert(`Failed to upload BOM: ${errorJson.detail || errorText}`);
+                    } catch {
+                        alert(`Failed to upload BOM: ${errorText}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error uploading BOM:', error);
+                alert(`Error uploading BOM: ${error.message || error}`);
+            }
+        }
+        
+        // View BOM details
+        async function viewBOMDetails(assetId, bomId) {
+            try {
+                const response = await fetch(`${API_BASE}/assets/${assetId}/bom/${bomId}`);
+                const bom = await response.json();
+                
+                // Create a modal or expand view to show details
+                let componentsHTML = '<ul class="list-group">';
+                bom.components.forEach(comp => {
+                    componentsHTML += `
+                        <li class="list-group-item">
+                            <strong>${comp.name}</strong> 
+                            <span class="badge bg-secondary">${comp.version}</span>
+                            ${comp.license ? `<span class="badge bg-info">${comp.license}</span>` : ''}
+                        </li>
+                    `;
+                });
+                componentsHTML += '</ul>';
+                
+                // For now, show in an alert - you could create a proper modal
+                const detailsHTML = `
+                    <h5>BOM Version: ${bom.version}</h5>
+                    <p>Format: ${bom.format}, Total Components: ${bom.total_components}</p>
+                    <h6>Components:</h6>
+                    ${componentsHTML}
+                `;
+                
+                // Create a simple modal
+                const modal = document.createElement('div');
+                modal.innerHTML = `
+                    <div class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">BOM Details</h5>
+                                    <button type="button" class="btn-close" onclick="this.closest('.modal').remove()"></button>
+                                </div>
+                                <div class="modal-body">
+                                    ${detailsHTML}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                
+            } catch (error) {
+                alert(`Error loading BOM details: ${error}`);
+            }
+        }
+        
+        // Delete BOM
+        async function deleteBOM(assetId, bomId) {
+            if (!confirm('Are you sure you want to delete this BOM version?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/assets/${assetId}/bom/${bomId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('BOM deleted successfully');
+                    // Reload BOM history
+                    loadBOMHistory(assetId);
+                } else {
+                    const error = await response.text();
+                    alert(`Failed to delete BOM: ${error}`);
+                }
+            } catch (error) {
+                alert(`Error deleting BOM: ${error}`);
+            }
+        }
+        
+        // Import assets
+        async function importAssets() {
+            const format = document.getElementById('import-format').value;
+            const file = document.getElementById('import-file').files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch(`${API_BASE}/io/import/${format}`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            alert(`Import complete: ${result.imported} imported, ${result.failed} failed`);
+            
+            // Load tree which will also update table
+            loadAssetTree();
+        }
+
+        // Export assets
+        async function exportAssets() {
+            const format = document.getElementById('export-format').value;
+            window.location.href = `${API_BASE}/io/export/${format}`;
+        }
+
+        // Refresh tree and table together
+        function refreshTree() {
+            loadAssetTree();
+        }
+    </script>
+</body>
+</html>
