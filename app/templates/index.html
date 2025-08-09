@@ -1480,61 +1480,142 @@
                 // First deselect all
                 assetTable.deselectRow();
                 
-                // Function to expand parent rows up to the target
-                function expandParentsAndSelect(assetId) {
-                    const rows = assetTable.getRows();
-                    
-                    // First, find the path to the asset
-                    function findPath(rows, targetId, path = []) {
+                // Function to search through all table data, including children
+                function findRowByAssetId(assetId) {
+                    // Recursive function to search through rows and their children
+                    function searchRowsRecursively(rows) {
                         for (let row of rows) {
-                            const currentPath = [...path, row];
-                            if (row.getData().id === targetId) {
-                                return currentPath;
+                            const data = row.getData();
+                            if (data && data.id === assetId) {
+                                return row;
                             }
+                            // Check children
                             const children = row.getTreeChildren();
                             if (children && children.length > 0) {
-                                const found = findPath(children, targetId, currentPath);
+                                const found = searchRowsRecursively(children);
                                 if (found) return found;
                             }
                         }
                         return null;
                     }
                     
-                    const pathToAsset = findPath(rows, assetId);
-                    
-                    if (pathToAsset && pathToAsset.length > 0) {
-                        // Expand all parents in the path
-                        for (let i = 0; i < pathToAsset.length - 1; i++) {
-                            pathToAsset[i].treeExpand();
-                        }
-                        
-                        // Select and scroll to the target row
-                        const targetRow = pathToAsset[pathToAsset.length - 1];
-                        targetRow.select();
-                        
-                        // Use setTimeout to ensure expansion is complete before scrolling
-                        setTimeout(() => {
-                            try {
-                                targetRow.scrollTo();
-                            } catch (e) {
-                                console.log('Could not scroll to row:', e);
-                            }
-                        }, 100);
+                    // Get all root-level rows
+                    const allRows = assetTable.getRows();
+                    if (!allRows || allRows.length === 0) {
+                        return null;
                     }
+                    
+                    return searchRowsRecursively(allRows);
                 }
                 
-                expandParentsAndSelect(assetId);
+                // Find the target row
+                const targetRow = findRowByAssetId(assetId);
+                
+                if (targetRow) {
+                    // Build the path from the target to root by traversing parent rows
+                    const path = [];
+                    let currentRow = targetRow;
+                    
+                    while (currentRow) {
+                        path.unshift(currentRow); // Add to beginning of array
+                        currentRow = currentRow.getTreeParent();
+                    }
+                    
+                    // Expand all parent rows in the path (except the target itself)
+                    for (let i = 0; i < path.length - 1; i++) {
+                        const row = path[i];
+                        if (row && row.treeExpand) {
+                            row.treeExpand();
+                        }
+                    }
+                    
+                    // Select and scroll to the target row
+                    if (targetRow.select) {
+                        targetRow.select();
+                    }
+                    
+                    // Use setTimeout to ensure expansion is complete before scrolling
+                    setTimeout(() => {
+                        try {
+                            if (targetRow.scrollTo) {
+                                targetRow.scrollTo();
+                            }
+                        } catch (e) {
+                            console.log('Could not scroll to row:', e);
+                        }
+                    }, 100);
+                } else {
+                    console.log(`Asset ${assetId} not found in table`);
+                    
+                    // Try refreshing the table data if asset not found
+                    if (typeof loadAssets === 'function') {
+                        loadAssets().then(() => {
+                            // Try again after refresh
+                            const retryRow = findRowByAssetId(assetId);
+                            if (retryRow) {
+                                // Build path and expand parents
+                                const path = [];
+                                let currentRow = retryRow;
+                                
+                                while (currentRow) {
+                                    path.unshift(currentRow);
+                                    currentRow = currentRow.getTreeParent();
+                                }
+                                
+                                for (let i = 0; i < path.length - 1; i++) {
+                                    if (path[i] && path[i].treeExpand) {
+                                        path[i].treeExpand();
+                                    }
+                                }
+                                
+                                if (retryRow.select) {
+                                    retryRow.select();
+                                }
+                                setTimeout(() => {
+                                    try {
+                                        if (retryRow.scrollTo) {
+                                            retryRow.scrollTo();
+                                        }
+                                    } catch (e) {
+                                        console.log('Could not scroll to row:', e);
+                                    }
+                                }, 100);
+                            } else {
+                                console.log(`Asset ${assetId} still not found after refresh`);
+                            }
+                        }).catch(error => {
+                            console.error('Error refreshing assets:', error);
+                        });
+                    }
+                }
             }
             
             // If we found the asset, update currentSelectedAsset
             if (foundAsset) {
                 currentSelectedAsset = foundAsset;
                 // Enable buttons
-                document.getElementById('edit-selected-btn').disabled = false;
+                const editBtn = document.getElementById('edit-selected-btn');
+                if (editBtn) {
+                    editBtn.disabled = false;
+                }
                 const bomBtn = document.getElementById('bom-history-btn');
-                if (bomBtn) bomBtn.disabled = false;
+                if (bomBtn) {
+                    bomBtn.disabled = false;
+                }
             } else {
-                console.error('Asset not found:', assetId);
+                console.log('Asset data not found in tree for ID:', assetId);
+                // Still try to enable buttons if we have a selected ID
+                if (assetId) {
+                    currentSelectedAsset = { id: assetId };
+                    const editBtn = document.getElementById('edit-selected-btn');
+                    if (editBtn) {
+                        editBtn.disabled = false;
+                    }
+                    const bomBtn = document.getElementById('bom-history-btn');
+                    if (bomBtn) {
+                        bomBtn.disabled = false;
+                    }
+                }
             }
             
             // Check if BOM History tab is active and update it
