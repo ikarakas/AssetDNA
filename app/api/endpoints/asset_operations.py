@@ -247,6 +247,40 @@ async def move_asset(
                 detail="Cannot move an asset to its own descendant"
             )
     
+    # Check if an asset with the same name already exists under the new parent
+    if new_parent_id != asset.parent_id:  # Only check if actually moving
+        name_check = await db.execute(
+            select(Asset).where(
+                Asset.parent_id == new_parent_id,
+                Asset.name == asset.name,
+                Asset.id != asset_id  # Exclude the asset being moved
+            )
+        )
+        if name_check.scalar_one_or_none():
+            # Find a unique name by adding a number suffix
+            base_name = asset.name
+            counter = 2
+            while True:
+                # Check if the name already has a number suffix pattern
+                import re
+                match = re.match(r'^(.*?)\s*\((\d+)\)$', base_name)
+                if match:
+                    # Extract base name without the number
+                    base_name = match.group(1).strip()
+                    counter = int(match.group(2)) + 1
+                
+                new_name = f"{base_name} ({counter})"
+                check = await db.execute(
+                    select(Asset).where(
+                        Asset.parent_id == new_parent_id,
+                        Asset.name == new_name
+                    )
+                )
+                if not check.scalar_one_or_none():
+                    asset.name = new_name
+                    break
+                counter += 1
+    
     # Update the parent
     asset.parent_id = new_parent_id
     

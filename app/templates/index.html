@@ -281,7 +281,7 @@
                                 <a class="nav-link" data-bs-toggle="tab" href="#bom-tab">BOM History</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" data-bs-toggle="tab" href="#import-export-tab">Import/Export</a>
+                                <a class="nav-link" data-bs-toggle="tab" href="#import-export-tab">Asset Import/Export</a>
                             </li>
                         </ul>
                     </div>
@@ -336,37 +336,57 @@
 
                             <!-- Import/Export Tab -->
                             <div class="tab-pane fade" id="import-export-tab">
+                                <div class="alert alert-info mb-4">
+                                    <h6><i class="bi bi-info-circle"></i> Asset Import/Export</h6>
+                                    <p class="mb-0">Import or export your entire asset hierarchy structure. This is different from BOM uploads which contain component lists for individual assets.</p>
+                                </div>
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <h5>Import Assets</h5>
-                                        <div class="mb-3">
-                                            <label class="form-label">Select Format:</label>
-                                            <select class="form-select" id="import-format">
-                                                <option value="csv">CSV</option>
-                                                <option value="json">JSON</option>
-                                            </select>
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h5>Import Asset Hierarchy</h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <p class="text-muted">Upload a file containing asset definitions to add them to your hierarchy.</p>
+                                                <div class="mb-3">
+                                                    <label class="form-label">File Format:</label>
+                                                    <select class="form-select" id="import-format">
+                                                        <option value="csv">CSV - Comma Separated Values</option>
+                                                        <option value="json">JSON - JavaScript Object Notation</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Select File:</label>
+                                                    <input type="file" class="form-control" id="import-file" accept=".csv,.json">
+                                                    <small class="text-muted">File must contain: name, asset_type, parent_name columns/fields</small>
+                                                </div>
+                                                <button class="btn btn-primary" onclick="importAssets()">
+                                                    <i class="bi bi-upload"></i> Import Assets
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div class="mb-3">
-                                            <input type="file" class="form-control" id="import-file" accept=".csv,.json">
-                                        </div>
-                                        <button class="btn btn-primary" onclick="importAssets()">
-                                            <i class="bi bi-upload"></i> Import
-                                        </button>
                                     </div>
                                     <div class="col-md-6">
-                                        <h5>Export Assets</h5>
-                                        <div class="mb-3">
-                                            <label class="form-label">Select Format:</label>
-                                            <select class="form-select" id="export-format">
-                                                <option value="csv">CSV</option>
-                                                <option value="json">JSON</option>
-                                                <option value="xml">XML</option>
-                                                <option value="excel">Excel</option>
-                                            </select>
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h5>Export Asset Hierarchy</h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <p class="text-muted">Download your complete asset hierarchy in various formats.</p>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Export Format:</label>
+                                                    <select class="form-select" id="export-format">
+                                                        <option value="csv">CSV - For spreadsheet applications</option>
+                                                        <option value="json">JSON - For programmatic use</option>
+                                                        <option value="xml">XML - For system integration</option>
+                                                        <option value="excel">Excel - Native spreadsheet format</option>
+                                                    </select>
+                                                </div>
+                                                <button class="btn btn-success" onclick="exportAssets()">
+                                                    <i class="bi bi-download"></i> Export All Assets
+                                                </button>
+                                            </div>
                                         </div>
-                                        <button class="btn btn-success" onclick="exportAssets()">
-                                            <i class="bi bi-download"></i> Export
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -1732,25 +1752,30 @@
                 bomHistory.innerHTML = `
                     <div class="card mb-3">
                         <div class="card-header">
-                            <h6>Upload New BOM</h6>
+                            <h6>Upload Bill of Materials (BOM)</h6>
                         </div>
                         <div class="card-body">
+                            <div class="alert alert-info">
+                                <small><strong>What is a BOM?</strong> A Bill of Materials lists all components, dependencies, or parts that make up this asset. For software, this might be libraries and packages. For hardware, this could be physical components.</small>
+                            </div>
                             <form id="bom-upload-form" onsubmit="uploadBOM(event)">
                                 <div class="mb-3">
-                                    <label class="form-label">BOM File (JSON)</label>
+                                    <label class="form-label">BOM File</label>
                                     <input type="file" class="form-control" id="bom-file" accept=".json" required>
+                                    <small class="text-muted">Upload a JSON file containing component information (CycloneDX, SPDX, or custom format)</small>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Version</label>
                                     <input type="text" class="form-control" id="bom-version" placeholder="e.g., 1.0.0" required>
+                                    <small class="text-muted">Version number for this BOM snapshot</small>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Type</label>
+                                    <label class="form-label">BOM Type</label>
                                     <select class="form-select" id="bom-type">
-                                        <option value="SBOM">SBOM (Software)</option>
-                                        <option value="HBOM">HBOM (Hardware)</option>
-                                        <option value="OBOM">OBOM (Operational)</option>
-                                        <option value="MBOM">MBOM (Manufacturing)</option>
+                                        <option value="SBOM">SBOM - Software Bill of Materials</option>
+                                        <option value="HBOM">HBOM - Hardware Bill of Materials</option>
+                                        <option value="OBOM">OBOM - Operational Bill of Materials</option>
+                                        <option value="MBOM">MBOM - Manufacturing Bill of Materials</option>
                                     </select>
                                 </div>
                                 <button type="submit" class="btn btn-primary">
