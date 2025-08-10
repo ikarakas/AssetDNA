@@ -503,6 +503,17 @@
         
         // Initialize on load
         document.addEventListener('DOMContentLoaded', async () => {
+            // Add global dragover handler to allow drops anywhere
+            document.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                return false;
+            });
+            
+            document.addEventListener('drop', (e) => {
+                e.preventDefault();
+                return false;
+            });
+            
             try {
                 await loadAssetTypes();
                 await loadAssetTree();
@@ -842,21 +853,21 @@
                 // Build the item HTML
                 let html = '';
                 
-                // Expand/collapse arrow - make it a proper button
+                // Expand/collapse arrow - make it a proper button and non-draggable
                 if (hasChildren) {
-                    html += `<span class="tree-expand" style="cursor: pointer;">${isExpanded ? '▼' : '▶'}</span>`;
+                    html += `<span class="tree-expand" style="cursor: pointer;" draggable="false">${isExpanded ? '▼' : '▶'}</span>`;
                 } else {
-                    html += '<span class="tree-expand"></span>';
+                    html += '<span class="tree-expand" draggable="false"></span>';
                 }
                 
-                // Icon and name
-                html += `<span class="tree-icon">${typeIcon}</span>`;
+                // Icon and name - make child elements non-draggable
+                html += `<span class="tree-icon" draggable="false">${typeIcon}</span>`;
                 const childrenCount = hasChildren ? ` (${node.children.length})` : '';
-                html += `<span class="asset-name">${node.name}${childrenCount}</span>`;
+                html += `<span class="asset-name" draggable="false">${node.name}${childrenCount}</span>`;
                 
                 // BOM badge
                 if (node.bom_count > 0) {
-                    html += `<span class="bom-badge">BOM: ${node.bom_count}</span>`;
+                    html += `<span class="bom-badge" draggable="false">BOM: ${node.bom_count}</span>`;
                 }
                 
                 item.innerHTML = html;
@@ -865,6 +876,10 @@
                 item.draggable = true; // Make the entire item draggable
                 item.style.cursor = 'move'; // Show move cursor
                 item.setAttribute('draggable', 'true'); // Also set as attribute for browser compatibility
+                
+                // Prevent text selection
+                item.style.userSelect = 'none';
+                item.style.webkitUserSelect = 'none';
                 item.style.MozUserSelect = 'none';
                 item.style.msUserSelect = 'none';
                 
