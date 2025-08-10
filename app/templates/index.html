@@ -454,6 +454,19 @@
                                         </button>
                                     </div>
                                 </div>
+                                <!-- Add search box for table -->
+                                <div class="mt-3 mb-2 d-flex align-items-center">
+                                    <div class="input-group" style="max-width: 500px;">
+                                        <input type="text" 
+                                               id="table-search" 
+                                               class="form-control" 
+                                               placeholder="Search by asset name...">
+                                        <button class="btn btn-outline-secondary" type="button" id="clear-search" style="display: none;">
+                                            <i class="bi bi-x-lg"></i> Clear
+                                        </button>
+                                    </div>
+                                    <span id="search-results-count" class="ms-3 text-muted" style="display: none;"></span>
+                                </div>
                                 <div id="asset-table"></div>
                             </div>
 
@@ -1662,7 +1675,7 @@
                 resizableRows: true,
                 selectable: 1,  // Only allow single selection
                 dataTree: true,
-                dataTreeStartExpanded: true,
+                dataTreeStartExpanded: true,  // Keep expanded to show all items
                 dataTreeChildField: "_children",
                 dataTreeChildIndent: 20,
                 dataTreeElementColumn: "name",
@@ -1792,6 +1805,44 @@
                 if (bomTab && bomTab.classList.contains('show') && bomTab.classList.contains('active')) {
                     loadBOMHistory(currentSelectedAsset.id);
                 }
+                
+                // Sync with tree selection
+                const assetId = row.getData().id;
+                selectedAssetId = assetId;
+                
+                // Clear tree selection
+                document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+                selectedAssets.clear();
+                
+                // Find and highlight the corresponding tree item
+                const treeItem = document.querySelector(`.tree-item[data-asset-id="${assetId}"]`);
+                if (treeItem) {
+                    treeItem.classList.add('selected');
+                    selectedAssets.add(assetId);
+                    
+                    // Ensure the tree node is visible by expanding parents
+                    let parent = treeItem.parentElement;
+                    while (parent) {
+                        if (parent.classList.contains('tree-children')) {
+                            const parentId = parent.dataset.parentId;
+                            if (parentId) {
+                                expandedNodes.add(String(parentId));
+                                parent.style.display = 'block';
+                                // Update expand arrow for parent
+                                const parentItem = document.querySelector(`.tree-item[data-asset-id="${parentId}"] .tree-expand`);
+                                if (parentItem) {
+                                    parentItem.textContent = '▼';
+                                }
+                            }
+                        }
+                        parent = parent.parentElement;
+                    }
+                    
+                    // Scroll tree item into view
+                    treeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                
+                updateMultiSelectUI();
             });
             
             assetTable.on("rowDeselected", function(row){
@@ -2068,6 +2119,30 @@
                     }
                 });
             }  // Close the if statement for selectedAssets.size <= 1
+            
+            // Sync with table selection - only select if visible
+            if (assetTable) {
+                // First deselect all rows
+                assetTable.deselectRow();
+                
+                // Only select if the asset is visible on current page
+                const visibleRows = assetTable.getRows("visible");
+                
+                for (let row of visibleRows) {
+                    const rowData = row.getData();
+                    // Check both id and name for matching (handles special nodes like "Uncategorized")
+                    if (rowData.id === assetId || 
+                        (rowData.name && rowData.name === assetId) ||
+                        (rowData.name && rowData.name.includes("Uncategorized") && assetId === "uncategorized")) {
+                        row.select();
+                        row.scrollTo();
+                        break;
+                    }
+                }
+                
+                // Note: Not doing page navigation to avoid performance issues
+                // User can use table's own navigation/search features
+            }
             
             // Find the asset data - first try table rows, then tree data
             let foundAsset = null;
@@ -2447,6 +2522,83 @@
                     }
                 });
             });
+            
+            // Add table search functionality
+            const searchInput = document.getElementById('table-search');
+            const clearButton = document.getElementById('clear-search');
+            const resultsCount = document.getElementById('search-results-count');
+            
+            if (searchInput) {
+                let searchTimeout;
+                
+                const performSearch = () => {
+                    const searchValue = searchInput.value.trim();
+                    
+                    if (assetTable) {
+                        if (searchValue === '') {
+                            // Clear all filters
+                            assetTable.clearFilter();
+                            clearButton.style.display = 'none';
+                            resultsCount.style.display = 'none';
+                        } else {
+                            // Show clear button
+                            clearButton.style.display = 'block';
+                            
+                            // Create a custom filter function that searches only in name field
+                            assetTable.setFilter(function(data) {
+                                const search = searchValue.toLowerCase();
+                                
+                                // Check if this row's name matches
+                                function checkMatch(item) {
+                                    // Only check the name field, case-insensitive
+                                    const nameMatches = item.name && item.name.toLowerCase().includes(search);
+                                    
+                                    // If this item matches, return true
+                                    if (nameMatches) {
+                                        return true;
+                                    }
+                                    
+                                    // Also check children recursively - if any child matches, show the parent
+                                    if (item._children && item._children.length > 0) {
+                                        return item._children.some(child => checkMatch(child));
+                                    }
+                                    
+                                    return false;
+                                }
+                                
+                                return checkMatch(data);
+                            });
+                            
+                            // Get filtered data count and show it
+                            setTimeout(() => {
+                                const filteredData = assetTable.getRows("active");
+                                const totalData = assetTable.getRows();
+                                resultsCount.textContent = `Found ${filteredData.length} of ${totalData.length} assets`;
+                                resultsCount.style.display = 'inline';
+                            }, 100);
+                        }
+                        
+                        // Reset to first page after filtering
+                        if (assetTable.getPageMax() > 0) {
+                            assetTable.setPage(1);
+                        }
+                    }
+                };
+                
+                searchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    // Debounce the search
+                    searchTimeout = setTimeout(performSearch, 300);
+                });
+                
+                // Clear button functionality
+                if (clearButton) {
+                    clearButton.addEventListener('click', () => {
+                        searchInput.value = '';
+                        performSearch();
+                    });
+                }
+            }
         });
 
         // Track metadata for current edit
