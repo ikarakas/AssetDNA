@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.asset import Asset, AssetType, AssetTypeEnum
 from app.schemas.common import ExportFormat, ImportResult
 
@@ -324,7 +325,7 @@ async def export_assets(
     # Get export metadata
     export_metadata = {
         "export_date": datetime.utcnow().isoformat(),
-        "app_version": "2.0.0",  # You might want to get this from a config
+        "app_version": settings.APP_VERSION,
         "hostname": socket.gethostname(),
         "host_ip": socket.gethostbyname(socket.gethostname()),
         "client_ip": request.client.host if request.client else "unknown",
@@ -515,7 +516,7 @@ def export_to_xml_hierarchical(assets: List[Asset], metadata: dict = None) -> Re
     import xml.dom.minidom as minidom
     
     root = ET.Element("AssetHierarchy")
-    root.set("version", "2.0")
+    root.set("version", settings.APP_VERSION)
     
     # Add metadata element
     if metadata:

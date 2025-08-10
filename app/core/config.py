@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     
     # Application
     APP_NAME: str = "AssetDNA"
-    APP_VERSION: str = "0.0.1-Wise"
+    APP_VERSION: str = "0.1.0"
     DEBUG: bool = Field(default=False, env="DEBUG")
     HOST: str = Field(default="0.0.0.0", env="HOST")
     PORT: int = Field(default=10001, env="PORT")
