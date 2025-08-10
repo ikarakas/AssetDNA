@@ -29,6 +29,26 @@ AssetDNA is a Bill of Materials (BOM) management system designed to track and an
 - **Web Server**: Uvicorn
 - **Frontend**: HTML5 + Vanilla JS (tabular interface)
 
+## Version Management
+AssetDNA uses a centralized version management system:
+
+- **Current Version**: 0.1.1
+- **Primary Source**: `app/core/config.py` → `APP_VERSION`
+- **Git Tags**: Version tags are created for each release (e.g., `v0.1.0`, `v0.1.1`)
+- **Automatic Updates**: All parts of the application automatically use the version from config
+- **API Integration**: System endpoint returns current version via `/api/v1/system/info`
+
+**Version Update Process:**
+1. Update `APP_VERSION` in `app/core/config.py`
+2. Commit changes: `git commit -m "Update version to X.Y.Z"`
+3. Create local tag: `git tag vX.Y.Z`
+4. Push remote tag: `git push origin vX.Y.Z`
+
+**Version Display:**
+- API Documentation: Shows in FastAPI docs
+- System Info: Available via `/api/v1/system/info`
+- Export Files: Included in CSV, JSON, and XML exports
+
 ## Installation
 
 ### Using Docker (Recommended)
@@ -50,6 +70,8 @@ make logs        # View logs
 make shell       # Open shell in app container
 make migrate     # Run database migrations
 make status      # Show service status
+make seed        # Seed database with test data
+make test        # Run tests
 make help        # Show all available commands
 ```
 
