@@ -742,26 +742,27 @@
                     rootDropZone.style.backgroundColor = '#e7f3ff';
                     rootDropZone.style.borderColor = '#007bff';
                     
+                    console.log('ROOT DROP ZONE - DROP TRIGGERED');
+                    console.log('Global draggedAssets:', window.draggedAssets || draggedAssets);
+                    console.log('Global draggedAsset:', window.draggedAsset || draggedAsset);
+                    
                     try {
-                        const draggedData = e.dataTransfer.getData('text/plain');
-                        if (!draggedData) {
-                            console.error('No drag data available');
-                            return;
-                        }
+                        // Use global variables directly instead of dataTransfer
+                        const assetsToMove = window.draggedAssets || draggedAssets || [];
+                        const singleAsset = window.draggedAsset || draggedAsset;
                         
                         let draggedAssetsData;
-                        try {
-                            draggedAssetsData = JSON.parse(draggedData);
-                        } catch (parseError) {
-                            console.error('Failed to parse drag data:', draggedData);
-                            // Fallback to using global draggedAssets
-                            draggedAssetsData = draggedAssets;
-                        }
-                        
-                        if (!draggedAssetsData || draggedAssetsData.length === 0) {
-                            console.error('No assets to drop');
+                        if (assetsToMove.length > 0) {
+                            draggedAssetsData = assetsToMove;
+                        } else if (singleAsset) {
+                            draggedAssetsData = [singleAsset];
+                        } else {
+                            console.error('No assets available to drop at root');
+                            alert('No assets selected for drop operation');
                             return;
                         }
+                        
+                        console.log('Moving assets to root:', draggedAssetsData);
                         
                         // Move to root (parent_id = null)
                         window.draggedAssetsForOperation = draggedAssetsData;
@@ -989,21 +990,15 @@
                     console.log('Setting dataTransfer data...');
                     
                     e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', JSON.stringify(draggedAssets));
+                    // Set dummy data to satisfy Chrome's requirements
+                    e.dataTransfer.setData('text/plain', 'moving');
                     
-                    // Create a custom drag image to ensure it's visible
-                    const dragImage = document.createElement('div');
-                    dragImage.innerHTML = `📦 ${draggedAssets.length} item(s)`;
-                    dragImage.style.position = 'absolute';
-                    dragImage.style.top = '-1000px';
-                    dragImage.style.backgroundColor = 'white';
-                    dragImage.style.padding = '5px';
-                    dragImage.style.border = '1px solid #ccc';
-                    dragImage.style.borderRadius = '3px';
-                    dragImage.style.zIndex = '9999';
-                    document.body.appendChild(dragImage);
-                    e.dataTransfer.setDragImage(dragImage, 10, 10);
-                    setTimeout(() => document.body.removeChild(dragImage), 0);
+                    // Store in window for reliable access during drop
+                    window.draggedAssets = draggedAssets;
+                    window.draggedAsset = draggedAsset;
+                    
+                    // Don't use custom drag image for now - let browser handle it
+                    // This might be causing the issue in Chrome
                     
                     // Add dragging style to all selected items
                     selectedAssets.forEach(id => {
@@ -1016,6 +1011,8 @@
                 
                 // Drag end
                 item.ondragend = (e) => {
+                    console.log('DRAG END');
+                    
                     // Hide root drop zone when dragging ends
                     const rootDropZone = document.getElementById('root-drop-zone');
                     if (rootDropZone) {
@@ -1033,14 +1030,18 @@
                         }
                     });
                     
+                    // Clear both local and window variables
                     draggedAsset = null;
                     dragOriginalParent = null;
                     draggedAssets = [];
                     dragOriginalParents.clear();
+                    window.draggedAsset = null;
+                    window.draggedAssets = null;
                 };
                 
                 // Drag over - allow drop
                 item.ondragover = (e) => {
+                    console.log('Drag over:', node.name);
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
                     item.style.backgroundColor = '#e7f3ff';
@@ -1057,16 +1058,28 @@
                     e.stopPropagation();
                     item.style.backgroundColor = '';
                     
-                    console.log('Drop handler called, draggedAssets:', draggedAssets);
+                    console.log('DROP HANDLER TRIGGERED on:', node.name);
+                    console.log('Current global draggedAssets:', window.draggedAssets || draggedAssets);
+                    console.log('Current global draggedAsset:', window.draggedAsset || draggedAsset);
                     
-                    if (draggedAssets.length === 0) {
-                        console.log('No draggedAssets, checking draggedAsset:', draggedAsset);
+                    // Use global variables directly (don't rely on dataTransfer in Chrome)
+                    const assetsToMove = window.draggedAssets || draggedAssets || [];
+                    const singleAsset = window.draggedAsset || draggedAsset;
+                    
+                    if (assetsToMove.length === 0) {
                         // Fallback to single asset for backward compatibility
-                        if (!draggedAsset || draggedAsset.id === node.id) {
-                            console.log('No valid dragged asset or dropping on itself');
+                        if (!singleAsset) {
+                            console.error('No assets available to drop');
+                            alert('No assets selected for drop operation');
                             return;
                         }
-                        draggedAssets = [draggedAsset];
+                        if (singleAsset.id === node.id) {
+                            console.log('Cannot drop asset on itself');
+                            return;
+                        }
+                        draggedAssets = [singleAsset];
+                    } else {
+                        draggedAssets = assetsToMove;
                     }
                     
                     // Check if any dragged asset is the drop target or its ancestor
