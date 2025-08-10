@@ -338,9 +338,6 @@
                             <button class="btn btn-sm btn-outline-secondary" onclick="refreshTree()">
                                 <i class="bi bi-arrow-clockwise"></i> Refresh
                             </button>
-                            <button class="btn btn-sm btn-outline-info" onclick="testDragAndDrop()">
-                                <i class="bi bi-bug"></i> Test Drag
-                            </button>
                         </div>
                         <div class="mb-2">
                             <small class="text-muted">
@@ -2748,35 +2745,6 @@
             loadAssetTree();
         }
         
-        // Test drag and drop functionality
-        function testDragAndDrop() {
-            console.log('=== DRAG AND DROP TEST ===');
-            console.log('HTML5 drag and drop system active');
-            
-            console.log('Tree items:');
-            const treeItems = document.querySelectorAll('.tree-item');
-            treeItems.forEach((item, index) => {
-                console.log(`Item ${index}:`, {
-                    name: item.dataset.assetName,
-                    id: item.dataset.assetId,
-                    draggable: item.draggable,
-                    hasEventListeners: item.ondragstart !== null
-                });
-            });
-            
-            console.log('Root drop zone:');
-            const rootDropZone = document.getElementById('root-drop-zone');
-            if (rootDropZone) {
-                console.log('Root drop zone found:', {
-                    display: rootDropZone.style.display,
-                    classes: rootDropZone.className
-                });
-            } else {
-                console.log('Root drop zone NOT found');
-            }
-            
-            console.log('=== END TEST ===');
-        }
         
     </script>
 </body>
