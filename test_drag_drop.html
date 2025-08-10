@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drag and Drop Test</title>
+    <style>
+        .draggable-item {
+            width: 100px;
+            height: 50px;
+            background-color: #007bff;
+            color: white;
+            text-align: center;
+            line-height: 50px;
+            margin: 10px;
+            cursor: grab;
+            user-select: none;
+        }
+        .draggable-item:active {
+            cursor: grabbing;
+        }
+        .drop-zone {
+            width: 200px;
+            height: 100px;
+            border: 2px dashed #28a745;
+            background-color: #d4edda;
+            text-align: center;
+            line-height: 100px;
+            margin: 10px;
+        }
+        .drop-zone.drag-over {
+            background-color: #c3e6cb;
+            border-color: #1e7e34;
+        }
+    </style>
+</head>
+<body>
+    <h1>Drag and Drop Test</h1>
+    
+    <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event)">
+        Drag Me
+    </div>
+    
+    <div class="drop-zone" 
+         ondragover="handleDragOver(event)" 
+         ondrop="handleDrop(event)"
+         ondragleave="handleDragLeave(event)">
+        Drop Zone
+    </div>
+    
+    <div id="status"></div>
+    
+    <script>
+        function handleDragStart(e) {
+            console.log('Drag start');
+            e.dataTransfer.setData('text/plain', 'test-data');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            e.target.classList.add('drag-over');
+        }
+        
+        function handleDragLeave(e) {
+            e.target.classList.remove('drag-over');
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            e.target.classList.remove('drag-over');
+            const data = e.dataTransfer.getData('text/plain');
+            document.getElementById('status').textContent = `Dropped: ${data}`;
+            console.log('Drop successful:', data);
+        }
+        
+        // Test if drag and drop is supported
+        document.addEventListener('DOMContentLoaded', () => {
+            const testItem = document.querySelector('.draggable-item');
+            console.log('Drag and drop support test:');
+            console.log('- draggable attribute:', testItem.getAttribute('draggable'));
+            console.log('- draggable property:', testItem.draggable);
+            console.log('- ondragstart:', !!testItem.ondragstart);
+            console.log('- ondragover:', !!document.querySelector('.drop-zone').ondragover);
+            console.log('- ondrop:', !!document.querySelector('.drop-zone').ondrop);
+        });
+    </script>
+</body>
+</html>

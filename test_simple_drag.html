@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Drag Test</title>
+    <style>
+        .item {
+            padding: 10px;
+            margin: 5px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            cursor: move;
+        }
+        .item.dragging {
+            opacity: 0.5;
+            background: #cce5ff;
+        }
+        .item.over {
+            background: #d4edda;
+            border: 2px dashed #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h3>Simple Drag Test</h3>
+    <div id="container"></div>
+    
+    <script>
+        // Create test items
+        const container = document.getElementById('container');
+        const items = ['Item 1', 'Item 2', 'Item 3', 'Item 4'];
+        
+        items.forEach((text, i) => {
+            const div = document.createElement('div');
+            div.className = 'item';
+            div.textContent = text;
+            div.draggable = true;
+            div.dataset.id = i;
+            
+            // Add event listeners directly
+            div.addEventListener('dragstart', (e) => {
+                console.log('Drag started:', text);
+                e.currentTarget.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', e.currentTarget.dataset.id);
+            });
+            
+            div.addEventListener('dragend', (e) => {
+                console.log('Drag ended:', text);
+                e.currentTarget.classList.remove('dragging');
+                document.querySelectorAll('.item').forEach(item => {
+                    item.classList.remove('over');
+                });
+            });
+            
+            div.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                e.currentTarget.classList.add('over');
+            });
+            
+            div.addEventListener('dragleave', (e) => {
+                e.currentTarget.classList.remove('over');
+            });
+            
+            div.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Drop on:', text);
+                const draggedId = e.dataTransfer.getData('text/plain');
+                console.log('Dropped item ID:', draggedId);
+                e.currentTarget.classList.remove('over');
+            });
+            
+            container.appendChild(div);
+        });
+        
+        console.log('Test page loaded. Try dragging items.');
+    </script>
+</body>
+</html>

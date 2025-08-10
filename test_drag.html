@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Drag and Drop</title>
+    <style>
+        .test-item {
+            padding: 10px;
+            margin: 5px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            cursor: move;
+        }
+        .test-item.dragging {
+            opacity: 0.5;
+            background: #cce5ff;
+        }
+        .drop-zone {
+            min-height: 100px;
+            border: 2px dashed #007bff;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .drop-zone.active {
+            background: #e3f2fd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Drag and Drop Test</h1>
+    
+    <div id="items">
+        <div class="test-item" draggable="true" data-id="1">Item 1 - Drag me!</div>
+        <div class="test-item" draggable="true" data-id="2">Item 2 - Drag me!</div>
+        <div class="test-item" draggable="true" data-id="3">Item 3 - Drag me!</div>
+    </div>
+    
+    <div class="drop-zone">Drop items here</div>
+    
+    <div id="log"></div>
+    
+    <script>
+        const log = document.getElementById('log');
+        
+        function addLog(msg) {
+            log.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
+            console.log(msg);
+        }
+        
+        // Add event listeners to all draggable items
+        document.querySelectorAll('.test-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                addLog(`Drag started: ${e.target.textContent}`);
+                e.target.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', e.target.dataset.id);
+            });
+            
+            item.addEventListener('dragend', (e) => {
+                addLog(`Drag ended: ${e.target.textContent}`);
+                e.target.classList.remove('dragging');
+            });
+        });
+        
+        // Add event listeners to drop zone
+        const dropZone = document.querySelector('.drop-zone');
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            dropZone.classList.add('active');
+        });
+        
+        dropZone.addEventListener('dragleave', (e) => {
+            dropZone.classList.remove('active');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('active');
+            const id = e.dataTransfer.getData('text/plain');
+            addLog(`Dropped item with ID: ${id}`);
+            
+            // Move the actual element
+            const draggedItem = document.querySelector(`.test-item[data-id="${id}"]`);
+            if (draggedItem) {
+                dropZone.appendChild(draggedItem);
+            }
+        });
+        
+        // Test what's happening
+        addLog('Page loaded, drag/drop initialized');
+        document.querySelectorAll('.test-item').forEach((item, i) => {
+            addLog(`Item ${i + 1}: draggable=${item.draggable}, has listeners=${item.ondragstart !== null}`);
+        });
+    </script>
+</body>
+</html>

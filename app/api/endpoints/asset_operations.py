@@ -13,6 +13,8 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.models.asset import Asset, AssetType
 
+import re
+
 
 class MoveAssetRequest(BaseModel):
     new_parent_id: Optional[UUID] = None
@@ -252,23 +254,23 @@ async def move_asset(
         name_check = await db.execute(
             select(Asset).where(
                 Asset.parent_id == new_parent_id,
-                Asset.name == asset.name,
-                Asset.id != asset_id  # Exclude the asset being moved
+                Asset.name == asset.name
             )
         )
         if name_check.scalar_one_or_none():
             # Find a unique name by adding a number suffix
             base_name = asset.name
-            counter = 2
-            while True:
-                # Check if the name already has a number suffix pattern
-                import re
-                match = re.match(r'^(.*?)\s*\((\d+)\)$', base_name)
-                if match:
-                    # Extract base name without the number
-                    base_name = match.group(1).strip()
-                    counter = int(match.group(2)) + 1
-                
+            counter = 1
+            
+            # Check if the name already has a number suffix pattern
+            match = re.match(r'^(.*?)\s*\((\d+)\)$', base_name)
+            if match:
+                # Extract base name without the number
+                base_name = match.group(1).strip()
+                counter = int(match.group(2)) + 1
+            
+            # Find the next available unique name
+            while counter <= 1000:  # Prevent infinite loops
                 new_name = f"{base_name} ({counter})"
                 check = await db.execute(
                     select(Asset).where(
@@ -280,6 +282,11 @@ async def move_asset(
                     asset.name = new_name
                     break
                 counter += 1
+            else:
+                # If we can't find a unique name after 1000 attempts, use timestamp
+                import time
+                timestamp = int(time.time())
+                asset.name = f"{base_name} ({timestamp})"
     
     # Update the parent
     asset.parent_id = new_parent_id

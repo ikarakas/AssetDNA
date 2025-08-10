@@ -81,7 +81,7 @@
             padding-left: 80px !important;
         }
         .tree-item { 
-            cursor: pointer; 
+            cursor: grab; 
             padding: 5px;
             user-select: none;
             border-radius: 3px;
@@ -99,6 +99,55 @@
             font-weight: 500;
         }
         
+        /* Drag and Drop Styling */
+        .tree-item.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+        
+        .tree-item.drop-target-valid {
+            background-color: #d4edda !important;
+            border: 2px dashed #28a745 !important;
+            border-radius: 5px;
+        }
+        
+        .tree-item.drop-target-invalid {
+            background-color: #f8d7da !important;
+            border: 2px dashed #dc3545 !important;
+            border-radius: 5px;
+        }
+        
+        .root-drop-zone {
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            background-color: #e7f3ff;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            color: #0056b3;
+        }
+        
+        .root-drop-zone:hover {
+            background-color: #cce5ff;
+            border-color: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);
+        }
+        
+        .root-drop-zone.active {
+            background-color: #cce5ff;
+            border-color: #0056b3;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
+        }
+        
+        .root-drop-zone i {
+            font-size: 1.2em;
+            margin-right: 8px;
+        }
+        
         .tree-item.selected:hover {
             background-color: #c1dce4;
         }
@@ -106,9 +155,29 @@
             opacity: 0.5;
             cursor: grabbing !important;
         }
-        .tree-item.drag-over { 
+                .tree-item.drag-over {
             background: #d4edda !important;
             border: 2px dashed #28a745;
+        }
+        
+        /* Ensure drag-over styles are visible */
+        .tree-item.drag-over {
+            background-color: #d4edda !important;
+            border: 2px dashed #28a745 !important;
+            z-index: 1000;
+        }
+        .tree-item[draggable="true"] {
+            cursor: move;
+        }
+        .tree-item[draggable="true"]:hover {
+            background-color: rgba(0, 123, 255, 0.05);
+        }
+        .tree-item[draggable="true"]:active {
+            cursor: grabbing;
+        }
+        .tree-item.dragging {
+            opacity: 0.5 !important;
+            background-color: #e3f2fd !important;
         }
         .tree-expand {
             cursor: pointer;
@@ -269,6 +338,15 @@
                             <button class="btn btn-sm btn-outline-secondary" onclick="refreshTree()">
                                 <i class="bi bi-arrow-clockwise"></i> Refresh
                             </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="testDragAndDrop()">
+                                <i class="bi bi-bug"></i> Test Drag
+                            </button>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i> 
+                                <strong>Drag & Drop:</strong> Click and drag any asset to move or copy it to a new location
+                            </small>
                         </div>
                         <div id="asset-tree" class="asset-tree"></div>
                     </div>
@@ -503,17 +581,18 @@
         
         // Initialize on load
         document.addEventListener('DOMContentLoaded', async () => {
-            // Prevent default drag behavior on the document
-            document.body.ondragover = (e) => {
+            // Add global dragover handler to allow drops
+            document.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
-                return false;
-            };
+            });
             
-            document.body.ondrop = (e) => {
+            // Prevent default drop behavior on document
+            document.addEventListener('drop', (e) => {
                 e.preventDefault();
-                return false;
-            };
+            });
+            
+            // Standard HTML5 drag and drop initialized
             
             try {
                 await loadAssetTypes();
@@ -525,6 +604,8 @@
                 
                 // Update system info every 30 seconds
                 setInterval(loadSystemInfo, 30000);
+                
+                // Event handlers are added directly to elements during tree rendering
                 
                 // Add keyboard shortcuts for edit modal
                 document.getElementById('editModal').addEventListener('keydown', function(e) {
@@ -715,21 +796,191 @@
             }
         }
         
+        // STANDARD HTML5 DRAG AND DROP SYSTEM
+        let draggedElement = null;
+        let draggedAssetData = null;
+        
+        function handleDragStart(e) {
+            // Prevent dragging if clicking on expand arrow
+            if (e.target.classList.contains('tree-expand')) {
+                e.preventDefault();
+                return;
+            }
+            
+            // Store the element and data
+            draggedElement = e.currentTarget;
+            draggedAssetData = {
+                id: draggedElement.dataset.assetId,
+                name: draggedElement.dataset.assetName,
+                parent_id: draggedElement.dataset.parentId || null
+            };
+            
+            // Set data transfer
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', JSON.stringify(draggedAssetData));
+            
+            // Set global variables for compatibility
+            window.draggedAsset = draggedAssetData;
+            window.draggedAssets = [draggedAssetData];
+            
+            // DO NOT modify the DOM during dragstart - schedule it for next tick
+            requestAnimationFrame(() => {
+                if (draggedElement) {
+                    draggedElement.classList.add('dragging');
+                }
+                const rootDropZone = document.getElementById('root-drop-zone');
+                if (rootDropZone) {
+                    rootDropZone.style.display = 'block';
+                }
+            });
+            
+            console.log('Drag started:', draggedAssetData.name);
+        }
+        
+        function handleDragEnd(e) {
+            console.log('Drag ended', e);
+            // Clean up visual feedback
+            if (draggedElement) {
+                draggedElement.classList.remove('dragging');
+            }
+            
+            // Hide root drop zone
+            const rootDropZone = document.getElementById('root-drop-zone');
+            if (rootDropZone) {
+                rootDropZone.style.display = 'none';
+                rootDropZone.classList.remove('active');
+            }
+            
+            // Clear all drop target highlights
+            document.querySelectorAll('.tree-item').forEach(item => {
+                item.classList.remove('drop-target-valid', 'drop-target-invalid');
+            });
+            
+            // Reset drag state
+            draggedElement = null;
+            draggedAssetData = null;
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault(); // Allow drop
+            e.dataTransfer.dropEffect = 'move';
+            
+            const treeItem = e.currentTarget;
+            if (treeItem !== draggedElement && isValidDropTarget(treeItem, draggedAssetData)) {
+                treeItem.classList.add('drop-target-valid');
+            }
+        }
+        
+        function handleDragEnter(e) {
+            const treeItem = e.currentTarget;
+            if (treeItem !== draggedElement) {
+                if (isValidDropTarget(treeItem, draggedAssetData)) {
+                    treeItem.classList.add('drop-target-valid');
+                } else {
+                    treeItem.classList.add('drop-target-invalid');
+                }
+            }
+        }
+        
+        function handleDragLeave(e) {
+            const treeItem = e.currentTarget;
+            treeItem.classList.remove('drop-target-valid', 'drop-target-invalid');
+        }
+        
+        function handleDrop(e) {
+            console.log('Drop event triggered on:', e.currentTarget.dataset.assetName);
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const dropTarget = e.currentTarget;
+            dropTarget.classList.remove('drop-target-valid', 'drop-target-invalid');
+            
+            // Don't allow dropping on itself
+            if (dropTarget === draggedElement) {
+                console.log('Cannot drop on itself');
+                return;
+            }
+            
+            // Validate drop target
+            if (!isValidDropTarget(dropTarget, draggedAssetData)) {
+                alert('Cannot drop an asset on its own descendant. This would create a circular reference.');
+                return;
+            }
+            
+            console.log('Processing drop of', draggedAssetData.name, 'onto', dropTarget.dataset.assetName);
+            // Process the drop
+            processAssetDrop(dropTarget, false);
+        }
+        
+        function isValidDropTarget(dropTarget, draggedAsset) {
+            if (!draggedAsset || !dropTarget) return false;
+            
+            // Can't drop on itself
+            if (dropTarget.dataset.assetId === draggedAsset.id) return false;
+            
+            // Check if dropping would create a circular reference
+            return !isDescendant(dropTarget.dataset.assetId, draggedAsset.id);
+        }
+        
+        function isDescendant(potentialParentId, potentialChildId) {
+            if (potentialParentId === potentialChildId) return true;
+            
+            // Find the potential parent in the tree
+            const parentNode = findAssetById(potentialParentId, globalTreeData);
+            if (!parentNode || !parentNode.children) return false;
+            
+            // Check if the potential child is in the children
+            for (const child of parentNode.children) {
+                if (child.id === potentialChildId || isDescendant(child.id, potentialChildId)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        function processAssetDrop(dropTarget, isRoot) {
+            if (!draggedAssetData) {
+                console.error('No dragged asset data available');
+                return;
+            }
+            
+            // Set global variables for the modal
+            window.draggedAssets = [draggedAssetData];
+            window.draggedAsset = draggedAssetData;
+            window.draggedAssetForOperation = draggedAssetData; // singular for compatibility
+            window.draggedAssetsForOperation = [draggedAssetData]; // plural for multi-select
+            window.dropTargetAsset = isRoot ? { id: null, name: 'Root' } : {
+                id: dropTarget.dataset.assetId,
+                name: dropTarget.dataset.assetName
+            };
+            
+            // Show move/copy modal
+            const message = `What would you like to do with "${draggedAssetData.name}"?`;
+            const destination = isRoot ? 'Root Level' : `Under "${dropTarget.dataset.assetName}"`;
+            
+            document.getElementById('moveCopyMessage').innerHTML = 
+                `<strong>${message}</strong><br><br>` +
+                `Selected: ${draggedAssetData.name}<br>` +
+                `Destination: <strong>${destination}</strong>`;
+            
+            const modal = new bootstrap.Modal(document.getElementById('moveCopyModal'));
+            modal.show();
+        }
+        
         // Render tree with drag-and-drop and expand/collapse
         function renderTree(nodes, container = document.getElementById('asset-tree'), level = 0, isRoot = true) {
             if (isRoot) {
                 container.innerHTML = '';
                 globalTreeData = nodes; // Store tree data globally
                 
-                // Add dragover handler to container to ensure drops work
-                container.ondragover = (e) => {
+                // Add dragover handler to container to allow drops
+                container.addEventListener('dragover', (e) => {
                     e.preventDefault();
-                    return false;
-                };
-                container.ondrop = (e) => {
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                container.addEventListener('drop', (e) => {
                     e.preventDefault();
-                    return false;
-                };
+                });
                 
                 // Add root drop zone at the top (initially hidden)
                 const rootDropZone = document.createElement('div');
@@ -737,81 +988,55 @@
                 rootDropZone.className = 'root-drop-zone';
                 rootDropZone.innerHTML = '<i class="bi bi-house-door"></i> Drop here to move to root level';
                 rootDropZone.style.display = 'none';
-                rootDropZone.style.padding = '10px';
-                rootDropZone.style.margin = '5px 0';
-                rootDropZone.style.border = '2px dashed #007bff';
-                rootDropZone.style.borderRadius = '5px';
-                rootDropZone.style.backgroundColor = '#e7f3ff';
-                rootDropZone.style.textAlign = 'center';
-                rootDropZone.style.cursor = 'pointer';
+                rootDropZone.style.position = 'relative';
+                rootDropZone.style.zIndex = '1000';
                 
-                // Add drag events to root drop zone
-                rootDropZone.ondragover = (e) => {
+                // Add standard HTML5 drag events to root drop zone
+                rootDropZone.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
-                    rootDropZone.style.backgroundColor = '#cce5ff';
-                    rootDropZone.style.borderColor = '#0056b3';
-                    return false;
-                };
+                    rootDropZone.classList.add('active');
+                });
                 
-                rootDropZone.ondragleave = (e) => {
-                    rootDropZone.style.backgroundColor = '#e7f3ff';
-                    rootDropZone.style.borderColor = '#007bff';
-                };
+                rootDropZone.addEventListener('dragenter', (e) => {
+                    e.preventDefault();
+                    rootDropZone.classList.add('active');
+                });
                 
-                rootDropZone.ondrop = async (e) => {
+                rootDropZone.addEventListener('dragleave', (e) => {
+                    // Only remove active class if we're leaving the root zone entirely
+                    if (!rootDropZone.contains(e.relatedTarget)) {
+                        rootDropZone.classList.remove('active');
+                    }
+                });
+                
+                rootDropZone.addEventListener('drop', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     rootDropZone.style.display = 'none';
-                    rootDropZone.style.backgroundColor = '#e7f3ff';
-                    rootDropZone.style.borderColor = '#007bff';
+                    rootDropZone.classList.remove('active');
                     
-                    console.log('ROOT DROP ZONE - DROP TRIGGERED');
-                    console.log('Global draggedAssets:', window.draggedAssets || draggedAssets);
-                    console.log('Global draggedAsset:', window.draggedAsset || draggedAsset);
-                    
+                    // Get dragged data from dataTransfer or fallback to global
+                    let draggedData;
                     try {
-                        // Use global variables directly instead of dataTransfer
-                        const assetsToMove = window.draggedAssets || draggedAssets || [];
-                        const singleAsset = window.draggedAsset || draggedAsset;
-                        
-                        let draggedAssetsData;
-                        if (assetsToMove.length > 0) {
-                            draggedAssetsData = assetsToMove;
-                        } else if (singleAsset) {
-                            draggedAssetsData = [singleAsset];
-                        } else {
-                            console.error('No assets available to drop at root');
-                            alert('No assets selected for drop operation');
-                            return;
+                        const jsonData = e.dataTransfer.getData('text/plain');
+                        if (jsonData) {
+                            draggedData = JSON.parse(jsonData);
                         }
-                        
-                        console.log('Moving assets to root:', draggedAssetsData);
-                        
-                        // Move to root (parent_id = null)
-                        window.draggedAssetsForOperation = draggedAssetsData;
-                        window.dropTargetAsset = { id: null, name: 'Root' };
-                        
-                        // Show confirmation modal
-                        const modalMessage = document.getElementById('moveCopyMessage');
-                        const assetNames = draggedAssetsData.map(a => a.name).join(', ');
-                        const message = draggedAssetsData.length === 1 
-                            ? `What would you like to do with "${draggedAssetsData[0].name}"?`
-                            : `What would you like to do with ${draggedAssetsData.length} selected assets?`;
-                        
-                        modalMessage.innerHTML = 
-                            `<strong>${message}</strong><br><br>` +
-                            `Selected: ${assetNames}<br>` +
-                            `Destination: <strong>Root Level</strong>`;
-                        
-                        const modal = new bootstrap.Modal(document.getElementById('moveCopyModal'));
-                        modal.show();
-                    } catch (error) {
-                        console.error('Error in root drop zone:', error);
-                        alert('Failed to process drop operation. Please try again.');
+                    } catch (err) {
+                        // Could not parse dataTransfer, using global variables
                     }
-                    return false;
-                };
+                    
+                    draggedData = draggedData || window.draggedAsset || draggedAssetData;
+                    
+                    if (!draggedData) {
+                        console.error('No asset data available for drop');
+                        return;
+                    }
+                    
+                    // Process the drop to root
+                    processAssetDrop(null, true);
+                });
                 
                 container.appendChild(rootDropZone);
                 
@@ -839,6 +1064,9 @@
                 item.dataset.assetName = node.name;
                 item.dataset.parentId = node.parent_id || '';
                 
+                // Make the item draggable using standard HTML5 drag/drop
+                item.draggable = true;
+                
                 const hasChildren = node.children && node.children.length > 0;
                 const isExpanded = expandedNodes.has(String(node.id));
                 
@@ -858,28 +1086,32 @@
                 // Build the item HTML
                 let html = '';
                 
-                // Expand/collapse arrow - make it a proper button and non-draggable
+                // Expand/collapse arrow
                 if (hasChildren) {
-                    html += `<span class="tree-expand" style="cursor: pointer;" draggable="false">${isExpanded ? '▼' : '▶'}</span>`;
+                    html += `<span class="tree-expand" style="cursor: pointer;">${isExpanded ? '▼' : '▶'}</span>`;
                 } else {
-                    html += '<span class="tree-expand" draggable="false"></span>';
+                    html += '<span class="tree-expand"></span>';
                 }
                 
-                // Icon and name - make child elements non-draggable
-                html += `<span class="tree-icon" draggable="false">${typeIcon}</span>`;
+                // Icon and name
+                html += `<span class="tree-icon">${typeIcon}</span>`;
                 const childrenCount = hasChildren ? ` (${node.children.length})` : '';
-                html += `<span class="asset-name" draggable="false">${node.name}${childrenCount}</span>`;
+                html += `<span class="asset-name">${node.name}${childrenCount}</span>`;
                 
                 // BOM badge
                 if (node.bom_count > 0) {
-                    html += `<span class="bom-badge" draggable="false">BOM: ${node.bom_count}</span>`;
+                    html += `<span class="bom-badge">BOM: ${node.bom_count}</span>`;
                 }
                 
                 item.innerHTML = html;
                 
-                // Set draggable properties AFTER setting innerHTML
-                item.setAttribute('draggable', 'true');
-                item.style.cursor = 'move';
+                // Add standard HTML5 drag/drop event handlers
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
+                item.addEventListener('dragover', handleDragOver);
+                item.addEventListener('drop', handleDrop);
+                item.addEventListener('dragenter', handleDragEnter);
+                item.addEventListener('dragleave', handleDragLeave);
                 
                 // Prevent text selection
                 item.style.userSelect = 'none';
@@ -898,64 +1130,64 @@
                 }
                 
                 // Click handler for selection with multi-select support
-                item.onclick = (e) => {
-                    // Don't handle clicks during drag operations
+                item.addEventListener('click', (e) => {
+                    // Don't handle clicks during drag operations or on expand arrow
                     if (e.defaultPrevented) return;
+                    if (draggedElement) return; // Don't handle clicks while dragging
+                    if (e.target.classList.contains('tree-expand')) return;
                     
-                    if (!e.target.classList.contains('tree-expand')) {
-                        e.stopPropagation();
-                        
-                        const assetId = String(node.id);
-                        
-                        // Multi-select with Ctrl/Cmd key
-                        if (e.ctrlKey || e.metaKey) {
-                            if (selectedAssets.has(assetId)) {
-                                selectedAssets.delete(assetId);
-                                item.classList.remove('selected');
-                            } else {
-                                selectedAssets.add(assetId);
-                                item.classList.add('selected');
-                            }
-                        } else if (e.shiftKey && selectedAssets.size > 0) {
-                            // Shift+click for range selection
-                            // Find all items between last selected and this one
-                            const allItems = document.querySelectorAll('.tree-item');
-                            const lastSelected = Array.from(selectedAssets).pop();
-                            let inRange = false;
-                            
-                            allItems.forEach(treeItem => {
-                                const itemId = treeItem.dataset.assetId;
-                                if (itemId === lastSelected || itemId === assetId) {
-                                    inRange = !inRange;
-                                    selectedAssets.add(itemId);
-                                    treeItem.classList.add('selected');
-                                    if (itemId === lastSelected && itemId === assetId) {
-                                        inRange = false; // Same item clicked
-                                    }
-                                } else if (inRange) {
-                                    selectedAssets.add(itemId);
-                                    treeItem.classList.add('selected');
-                                }
-                            });
-                            selectedAssets.add(assetId);
-                            item.classList.add('selected');
+                    e.stopPropagation();
+                    
+                    const assetId = String(node.id);
+                    
+                    // Multi-select with Ctrl/Cmd key
+                    if (e.ctrlKey || e.metaKey) {
+                        if (selectedAssets.has(assetId)) {
+                            selectedAssets.delete(assetId);
+                            item.classList.remove('selected');
                         } else {
-                            // Regular click - clear selection and select only this
-                            document.querySelectorAll('.tree-item.selected').forEach(el => {
-                                el.classList.remove('selected');
-                            });
-                            selectedAssets.clear();
                             selectedAssets.add(assetId);
                             item.classList.add('selected');
-                            
-                            // Only call selectAsset for single selection (not multi-select)
-                            selectAsset(node.id);
                         }
+                    } else if (e.shiftKey && selectedAssets.size > 0) {
+                        // Shift+click for range selection
+                        // Find all items between last selected and this one
+                        const allItems = document.querySelectorAll('.tree-item');
+                        const lastSelected = Array.from(selectedAssets).pop();
+                        let inRange = false;
                         
-                        // Update UI to show multi-select count
-                        updateMultiSelectUI();
+                        allItems.forEach(treeItem => {
+                            const itemId = treeItem.dataset.assetId;
+                            if (itemId === lastSelected || itemId === assetId) {
+                                inRange = !inRange;
+                                selectedAssets.add(itemId);
+                                treeItem.classList.add('selected');
+                                if (itemId === lastSelected && itemId === assetId) {
+                                    inRange = false; // Same item clicked
+                                }
+                            } else if (inRange) {
+                                selectedAssets.add(itemId);
+                                treeItem.classList.add('selected');
+                            }
+                        });
+                        selectedAssets.add(assetId);
+                        item.classList.add('selected');
+                    } else {
+                        // Regular click - clear selection and select only this
+                        document.querySelectorAll('.tree-item.selected').forEach(el => {
+                            el.classList.remove('selected');
+                        });
+                        selectedAssets.clear();
+                        selectedAssets.add(assetId);
+                        item.classList.add('selected');
+                        
+                        // Only call selectAsset for single selection (not multi-select)
+                        selectAsset(node.id);
                     }
-                };
+                    
+                    // Update UI to show multi-select count
+                    updateMultiSelectUI();
+                });
                 
                 // Right-click handler for context menu
                 item.oncontextmenu = (e) => {
@@ -975,176 +1207,8 @@
                     }
                 };
                 
-                // Drag start - support multi-select
-                item.ondragstart = (e) => {
-                    console.log('DRAG START TRIGGERED for:', node.name);
-                    const assetId = String(node.id);
-                    
-                    // Show root drop zone when dragging starts
-                    const rootDropZone = document.getElementById('root-drop-zone');
-                    if (rootDropZone) {
-                        rootDropZone.style.display = 'block';
-                        console.log('Root drop zone shown');
-                    }
-                    
-                    // If this item is not in the selection, clear selection and select only this
-                    if (!selectedAssets.has(assetId)) {
-                        document.querySelectorAll('.tree-item.selected').forEach(el => {
-                            el.classList.remove('selected');
-                        });
-                        selectedAssets.clear();
-                        selectedAssets.add(assetId);
-                        item.classList.add('selected');
-                    }
-                    
-                    // Prepare dragged assets
-                    draggedAssets = [];
-                    dragOriginalParents.clear();
-                    
-                    selectedAssets.forEach(id => {
-                        const asset = findAssetById(id, globalTreeData);
-                        if (asset) {
-                            draggedAssets.push(asset);
-                            dragOriginalParents.set(id, asset.parent_id);
-                        }
-                    });
-                    
-                    // Keep backward compatibility
-                    draggedAsset = node;
-                    dragOriginalParent = node.parent_id;
-                    
-                    console.log('Drag start - draggedAssets:', draggedAssets);
-                    console.log('Setting dataTransfer data...');
-                    
-                    // Store in window for reliable access during drop
-                    window.draggedAssets = draggedAssets;
-                    window.draggedAsset = draggedAsset;
-                    
-                    // IMPORTANT: Set drag effect and data
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', node.id.toString());
-                    
-                    // Add dragging style to all selected items
-                    selectedAssets.forEach(id => {
-                        const el = document.querySelector(`.tree-item[data-asset-id="${id}"]`);
-                        if (el) el.style.opacity = '0.5';
-                    });
-                    
-                    console.log(`Dragging ${draggedAssets.length} asset(s)`);
-                };
-                
-                // Drag end
-                item.ondragend = (e) => {
-                    console.log('DRAG END');
-                    
-                    // Hide root drop zone when dragging ends
-                    const rootDropZone = document.getElementById('root-drop-zone');
-                    if (rootDropZone) {
-                        rootDropZone.style.display = 'none';
-                        rootDropZone.style.backgroundColor = '#e7f3ff';
-                        rootDropZone.style.borderColor = '#007bff';
-                    }
-                    
-                    // Reset opacity for all selected items
-                    selectedAssets.forEach(id => {
-                        const el = document.querySelector(`.tree-item[data-asset-id="${id}"]`);
-                        if (el) {
-                            el.style.opacity = '';
-                            el.style.backgroundColor = '';
-                        }
-                    });
-                    
-                    // Clear both local and window variables
-                    draggedAsset = null;
-                    dragOriginalParent = null;
-                    draggedAssets = [];
-                    dragOriginalParents.clear();
-                    window.draggedAsset = null;
-                    window.draggedAssets = null;
-                };
-                
-                // Drag enter
-                item.ondragenter = (e) => {
-                    if (e.preventDefault) e.preventDefault();
-                    console.log('Drag enter:', node.name);
-                    return false;
-                };
-                
-                // Drag over - allow drop
-                item.ondragover = (e) => {
-                    if (e.preventDefault) e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    item.style.backgroundColor = '#e7f3ff';
-                    return false;
-                };
-                
-                // Drag leave
-                item.ondragleave = (e) => {
-                    item.style.backgroundColor = '';
-                };
-                
-                // Drop handler - support multiple assets
-                item.ondrop = async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    item.style.backgroundColor = '';
-                    
-                    console.log('DROP HANDLER TRIGGERED on:', node.name);
-                    console.log('Current global draggedAssets:', window.draggedAssets || draggedAssets);
-                    console.log('Current global draggedAsset:', window.draggedAsset || draggedAsset);
-                    
-                    // Use global variables directly (don't rely on dataTransfer in Chrome)
-                    const assetsToMove = window.draggedAssets || draggedAssets || [];
-                    const singleAsset = window.draggedAsset || draggedAsset;
-                    
-                    if (assetsToMove.length === 0) {
-                        // Fallback to single asset for backward compatibility
-                        if (!singleAsset) {
-                            console.error('No assets available to drop');
-                            alert('No assets selected for drop operation');
-                            return;
-                        }
-                        if (singleAsset.id === node.id) {
-                            console.log('Cannot drop asset on itself');
-                            return;
-                        }
-                        draggedAssets = [singleAsset];
-                    } else {
-                        draggedAssets = assetsToMove;
-                    }
-                    
-                    // Check if any dragged asset is the drop target or its ancestor
-                    for (let asset of draggedAssets) {
-                        if (asset.id === node.id) {
-                            alert("Cannot drop an asset on itself!");
-                            return;
-                        }
-                        if (isDescendant(node, asset)) {
-                            alert(`Cannot move "${asset.name}" - it would create a circular reference!`);
-                            return;
-                        }
-                    }
-                    
-                    // Store the drop target and dragged assets for move/copy operations
-                    window.dropTargetAsset = node;
-                    window.draggedAssetsForOperation = draggedAssets;
-                    window.draggedAssetForOperation = draggedAssets[0]; // Keep for compatibility
-                    
-                    // Show move/copy dialog
-                    const assetNames = draggedAssets.map(a => a.name).join(', ');
-                    const message = draggedAssets.length === 1 
-                        ? `What would you like to do with "${draggedAssets[0].name}"?`
-                        : `What would you like to do with ${draggedAssets.length} selected assets?`;
-                    
-                    document.getElementById('moveCopyMessage').innerHTML = 
-                        `<strong>${message}</strong><br><br>` +
-                        `Selected: ${assetNames}<br>` +
-                        `Destination: Under "${node.name}"`;
-                    
-                    const modal = new bootstrap.Modal(document.getElementById('moveCopyModal'));
-                    modal.show();
-                    return false;
-                };
+
+
                 
                 itemWrapper.appendChild(item);
                 container.appendChild(itemWrapper);
@@ -1229,7 +1293,7 @@
             if (!potentialParent.children) return false;
             
             for (let child of potentialParent.children) {
-                if (child.id === potentialChild.id) return true;
+                if (String(child.id) === String(potentialChild.id)) return true;
                 if (isDescendant(potentialChild, child)) return true;
             }
             return false;
@@ -1309,6 +1373,14 @@
             window.draggedAssetForOperation = null;
             window.draggedAssetsForOperation = null;
             window.dropTargetAsset = null;
+            
+            // Clear the original drag variables after successful operation
+            draggedAsset = null;
+            dragOriginalParent = null;
+            draggedAssets = [];
+            dragOriginalParents.clear();
+            window.draggedAsset = null;
+            window.draggedAssets = null;
             
             // Refresh the tree
             await loadAssetTree();
@@ -1396,6 +1468,14 @@
             window.draggedAssetForOperation = null;
             window.draggedAssetsForOperation = null;
             window.dropTargetAsset = null;
+            
+            // Clear the original drag variables after successful operation
+            draggedAsset = null;
+            dragOriginalParent = null;
+            draggedAssets = [];
+            dragOriginalParents.clear();
+            window.draggedAsset = null;
+            window.draggedAssets = null;
             
             // Refresh the tree
             await loadAssetTree();
@@ -2667,6 +2747,37 @@
         function refreshTree() {
             loadAssetTree();
         }
+        
+        // Test drag and drop functionality
+        function testDragAndDrop() {
+            console.log('=== DRAG AND DROP TEST ===');
+            console.log('HTML5 drag and drop system active');
+            
+            console.log('Tree items:');
+            const treeItems = document.querySelectorAll('.tree-item');
+            treeItems.forEach((item, index) => {
+                console.log(`Item ${index}:`, {
+                    name: item.dataset.assetName,
+                    id: item.dataset.assetId,
+                    draggable: item.draggable,
+                    hasEventListeners: item.ondragstart !== null
+                });
+            });
+            
+            console.log('Root drop zone:');
+            const rootDropZone = document.getElementById('root-drop-zone');
+            if (rootDropZone) {
+                console.log('Root drop zone found:', {
+                    display: rootDropZone.style.display,
+                    classes: rootDropZone.className
+                });
+            } else {
+                console.log('Root drop zone NOT found');
+            }
+            
+            console.log('=== END TEST ===');
+        }
+        
     </script>
 </body>
 </html>
