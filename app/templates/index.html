@@ -158,6 +158,24 @@
             font-weight: 500;
         }
         
+        /* Tree search highlighting */
+        .tree-item.search-highlight {
+            background-color: #fff3cd !important;
+        }
+        
+        .tree-item.search-current {
+            background-color: #ffc107 !important;
+            color: #000;
+        }
+        
+        .tree-item.search-highlight.selected {
+            background-color: #c3e6fb !important;
+        }
+        
+        .tree-item.search-current.selected {
+            background-color: #fd7e14 !important;
+        }
+        
         /* Drag and Drop Styling */
         .tree-item.dragging {
             opacity: 0.5;
@@ -401,6 +419,25 @@
                                 <i class="bi bi-check2-square"></i> <span id="selection-count-text">0</span> selected
                             </span>
                         </div>
+                        <!-- Tree search box -->
+                        <div class="mb-2">
+                            <div class="input-group input-group-sm">
+                                <input type="text" 
+                                       id="tree-search" 
+                                       class="form-control form-control-sm" 
+                                       placeholder="Find in tree...">
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="tree-search-prev" title="Previous match" style="display: none;">
+                                    <i class="bi bi-chevron-up"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="tree-search-next" title="Next match" style="display: none;">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" id="tree-search-clear" style="display: none;">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                            <small id="tree-search-status" class="text-muted" style="display: none;"></small>
+                        </div>
                         <div class="mb-2">
                             <small class="text-muted">
                                 <i class="bi bi-info-circle"></i> 
@@ -422,6 +459,9 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" data-bs-toggle="tab" href="#bom-tab">BOM History</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#summary-tab">Assets Summary</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" data-bs-toggle="tab" href="#import-export-tab">Asset Import/Export</a>
@@ -488,6 +528,65 @@
                                     <i class="bi bi-info-circle"></i> Select an asset to view its BOM history
                                 </div>
                                 <div id="bom-history"></div>
+                            </div>
+
+                            <!-- Assets Summary Tab -->
+                            <div class="tab-pane fade" id="summary-tab">
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <h5 class="mb-3">Asset Type Summary</h5>
+                                        <div id="summary-loading" class="text-center p-4">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <p class="mt-2">Loading asset summary...</p>
+                                        </div>
+                                        <div id="summary-content" style="display: none;">
+                                            <div class="row mb-3">
+                                                <div class="col-md-4">
+                                                    <div class="card text-center">
+                                                        <div class="card-body">
+                                                            <h3 class="text-primary" id="total-assets-count">0</h3>
+                                                            <p class="text-muted mb-0">Total Assets</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="card text-center">
+                                                        <div class="card-body">
+                                                            <h3 class="text-success" id="active-assets-count">0</h3>
+                                                            <p class="text-muted mb-0">Active Assets</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="card text-center">
+                                                        <div class="card-body">
+                                                            <h3 class="text-warning" id="inactive-assets-count">0</h3>
+                                                            <p class="text-muted mb-0">Inactive Assets</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <h6 class="mb-0">Assets by Type</h6>
+                                                </div>
+                                                <div class="card-body">
+                                                    <div id="asset-type-table"></div>
+                                                </div>
+                                            </div>
+                                            <div class="mt-3">
+                                                <button class="btn btn-primary" onclick="refreshAssetSummary()">
+                                                    <i class="bi bi-arrow-clockwise"></i> Refresh Summary
+                                                </button>
+                                                <button class="btn btn-success ms-2" onclick="exportSummaryCSV()">
+                                                    <i class="bi bi-download"></i> Export to CSV
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Import/Export Tab -->
@@ -2512,6 +2611,91 @@
             }
         }
         
+        // Function to load asset summary
+        async function loadAssetSummary() {
+            const loadingDiv = document.getElementById('summary-loading');
+            const contentDiv = document.getElementById('summary-content');
+            
+            loadingDiv.style.display = 'block';
+            contentDiv.style.display = 'none';
+            
+            try {
+                // Fetch summary from the dedicated endpoint
+                const response = await fetch(`${API_BASE}/assets/summary`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch summary: ${response.status}`);
+                }
+                
+                const summary = await response.json();
+                
+                // Update total counts
+                document.getElementById('total-assets-count').textContent = summary.total_assets;
+                document.getElementById('active-assets-count').textContent = summary.active_assets;
+                document.getElementById('inactive-assets-count').textContent = summary.inactive_assets;
+                
+                // Prepare data for the table
+                const typeData = summary.by_type;
+                
+                // Create or update the summary table
+                if (window.summaryTable) {
+                    window.summaryTable.setData(typeData);
+                } else {
+                    window.summaryTable = new Tabulator("#asset-type-table", {
+                        data: typeData,
+                        layout: "fitColumns",
+                        height: "400px",
+                        columns: [
+                            {title: "Asset Type", field: "type", width: 300},
+                            {title: "Total", field: "total", hozAlign: "center", width: 100,
+                             formatter: function(cell) {
+                                 const value = cell.getValue();
+                                 return `<strong>${value}</strong>`;
+                             }},
+                            {title: "Active", field: "active", hozAlign: "center", width: 100,
+                             formatter: function(cell) {
+                                 const value = cell.getValue();
+                                 return `<span class="text-success">${value}</span>`;
+                             }},
+                            {title: "Inactive", field: "inactive", hozAlign: "center", width: 100,
+                             formatter: function(cell) {
+                                 const value = cell.getValue();
+                                 return `<span class="text-warning">${value}</span>`;
+                             }},
+                            {title: "Percentage", field: "percentage", hozAlign: "center", width: 120,
+                             formatter: function(cell) {
+                                 const value = cell.getValue();
+                                 return `
+                                     <div class="progress" style="height: 20px;">
+                                         <div class="progress-bar" role="progressbar" 
+                                              style="width: ${value}%">${value}%</div>
+                                     </div>
+                                 `;
+                             }}
+                        ]
+                    });
+                }
+                
+                loadingDiv.style.display = 'none';
+                contentDiv.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading asset summary:', error);
+                loadingDiv.innerHTML = '<div class="alert alert-danger">Failed to load asset summary</div>';
+            }
+        }
+        
+        // Function to refresh asset summary
+        function refreshAssetSummary() {
+            loadAssetSummary();
+        }
+        
+        // Function to export summary to CSV
+        function exportSummaryCSV() {
+            if (window.summaryTable) {
+                window.summaryTable.download("csv", "asset_summary.csv");
+            }
+        }
+        
         // Handle tab changes
         document.addEventListener('DOMContentLoaded', () => {
             // Add tab change listener
@@ -2519,9 +2703,144 @@
                 tab.addEventListener('shown.bs.tab', (e) => {
                     if (e.target.getAttribute('href') === '#bom-tab' && selectedAssetId) {
                         loadBOMHistory(selectedAssetId);
+                    } else if (e.target.getAttribute('href') === '#summary-tab') {
+                        loadAssetSummary();
                     }
                 });
             });
+            
+            // Add tree search functionality (highlight, not filter)
+            const treeSearchInput = document.getElementById('tree-search');
+            const treeSearchPrev = document.getElementById('tree-search-prev');
+            const treeSearchNext = document.getElementById('tree-search-next');
+            const treeSearchClear = document.getElementById('tree-search-clear');
+            const treeSearchStatus = document.getElementById('tree-search-status');
+            
+            let treeSearchMatches = [];
+            let currentMatchIndex = -1;
+            
+            if (treeSearchInput) {
+                const performTreeSearch = () => {
+                    const searchValue = treeSearchInput.value.trim().toLowerCase();
+                    
+                    // Clear previous highlights
+                    document.querySelectorAll('.tree-item').forEach(item => {
+                        item.classList.remove('search-highlight', 'search-current');
+                    });
+                    
+                    treeSearchMatches = [];
+                    currentMatchIndex = -1;
+                    
+                    if (searchValue === '') {
+                        // Hide navigation buttons and status
+                        treeSearchPrev.style.display = 'none';
+                        treeSearchNext.style.display = 'none';
+                        treeSearchClear.style.display = 'none';
+                        treeSearchStatus.style.display = 'none';
+                        return;
+                    }
+                    
+                    // Show clear button
+                    treeSearchClear.style.display = 'block';
+                    
+                    // Find all matching tree items
+                    document.querySelectorAll('.tree-item').forEach(item => {
+                        const name = item.dataset.assetName;
+                        if (name && name.toLowerCase().includes(searchValue)) {
+                            treeSearchMatches.push(item);
+                            item.classList.add('search-highlight');
+                            
+                            // Expand parents to make this item visible
+                            let parent = item.parentElement;
+                            while (parent) {
+                                if (parent.classList.contains('tree-children')) {
+                                    const parentId = parent.dataset.parentId;
+                                    if (parentId) {
+                                        expandedNodes.add(String(parentId));
+                                        parent.style.display = 'block';
+                                        // Update expand arrow
+                                        const parentItem = document.querySelector(`.tree-item[data-asset-id="${parentId}"] .tree-expand`);
+                                        if (parentItem) {
+                                            parentItem.textContent = '▼';
+                                        }
+                                    }
+                                }
+                                parent = parent.parentElement;
+                            }
+                        }
+                    });
+                    
+                    // Update status and navigation
+                    if (treeSearchMatches.length > 0) {
+                        currentMatchIndex = 0;
+                        treeSearchMatches[0].classList.add('search-current');
+                        treeSearchMatches[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        // Show navigation buttons if multiple matches
+                        if (treeSearchMatches.length > 1) {
+                            treeSearchPrev.style.display = 'block';
+                            treeSearchNext.style.display = 'block';
+                        }
+                        
+                        // Update status
+                        treeSearchStatus.textContent = `${currentMatchIndex + 1} of ${treeSearchMatches.length} matches`;
+                        treeSearchStatus.style.display = 'block';
+                    } else {
+                        treeSearchStatus.textContent = 'No matches found';
+                        treeSearchStatus.style.display = 'block';
+                    }
+                };
+                
+                // Navigate to previous match
+                const goToPrevMatch = () => {
+                    if (treeSearchMatches.length === 0) return;
+                    
+                    treeSearchMatches[currentMatchIndex].classList.remove('search-current');
+                    currentMatchIndex = (currentMatchIndex - 1 + treeSearchMatches.length) % treeSearchMatches.length;
+                    treeSearchMatches[currentMatchIndex].classList.add('search-current');
+                    treeSearchMatches[currentMatchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    treeSearchStatus.textContent = `${currentMatchIndex + 1} of ${treeSearchMatches.length} matches`;
+                };
+                
+                // Navigate to next match
+                const goToNextMatch = () => {
+                    if (treeSearchMatches.length === 0) return;
+                    
+                    treeSearchMatches[currentMatchIndex].classList.remove('search-current');
+                    currentMatchIndex = (currentMatchIndex + 1) % treeSearchMatches.length;
+                    treeSearchMatches[currentMatchIndex].classList.add('search-current');
+                    treeSearchMatches[currentMatchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    treeSearchStatus.textContent = `${currentMatchIndex + 1} of ${treeSearchMatches.length} matches`;
+                };
+                
+                // Event listeners
+                let searchTimeout;
+                treeSearchInput.addEventListener('input', () => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(performTreeSearch, 300);
+                });
+                
+                treeSearchInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                            goToPrevMatch();
+                        } else {
+                            goToNextMatch();
+                        }
+                    }
+                });
+                
+                treeSearchPrev.addEventListener('click', goToPrevMatch);
+                treeSearchNext.addEventListener('click', goToNextMatch);
+                
+                treeSearchClear.addEventListener('click', () => {
+                    treeSearchInput.value = '';
+                    performTreeSearch();
+                });
+            }
             
             // Add table search functionality
             const searchInput = document.getElementById('table-search');
@@ -2572,8 +2891,7 @@
                             // Get filtered data count and show it
                             setTimeout(() => {
                                 const filteredData = assetTable.getRows("active");
-                                const totalData = assetTable.getRows();
-                                resultsCount.textContent = `Found ${filteredData.length} of ${totalData.length} assets`;
+                                resultsCount.textContent = `Found ${filteredData.length} assets`;
                                 resultsCount.style.display = 'inline';
                             }, 100);
                         }

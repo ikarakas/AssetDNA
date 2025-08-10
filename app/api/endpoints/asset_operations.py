@@ -27,6 +27,56 @@ class CopyAssetRequest(BaseModel):
 router = APIRouter()
 
 
+@router.get("/assets/summary")
+async def get_asset_summary(db: AsyncSession = Depends(get_db)):
+    """
+    Get summary statistics for all assets grouped by type
+    """
+    from sqlalchemy import func, case
+    
+    # Query to get counts by asset type and status
+    result = await db.execute(
+        select(
+            AssetType.name.label('type_name'),
+            func.count(Asset.id).label('total'),
+            func.sum(case((Asset.status == 'active', 1), else_=0)).label('active'),
+            func.sum(case((Asset.status != 'active', 1), else_=0)).label('inactive')
+        )
+        .join(Asset, Asset.asset_type_id == AssetType.id)
+        .group_by(AssetType.name)
+        .order_by(func.count(Asset.id).desc())
+    )
+    
+    type_summary = result.all()
+    
+    # Get total counts
+    total_result = await db.execute(
+        select(
+            func.count(Asset.id).label('total'),
+            func.sum(case((Asset.status == 'active', 1), else_=0)).label('active'),
+            func.sum(case((Asset.status != 'active', 1), else_=0)).label('inactive')
+        )
+    )
+    
+    totals = total_result.first()
+    
+    return {
+        "total_assets": totals.total or 0,
+        "active_assets": totals.active or 0,
+        "inactive_assets": totals.inactive or 0,
+        "by_type": [
+            {
+                "type": row.type_name,
+                "total": row.total,
+                "active": row.active or 0,
+                "inactive": row.inactive or 0,
+                "percentage": round((row.total / totals.total * 100), 1) if totals.total > 0 else 0
+            }
+            for row in type_summary
+        ]
+    }
+
+
 async def deep_copy_asset(
     asset: Asset,
     new_parent_id: Optional[UUID],

@@ -14,6 +14,13 @@ api_router.include_router(
     tags=["System"]
 )
 
+# Asset operations must come before assets to ensure /assets/summary is matched before /assets/{asset_id}
+api_router.include_router(
+    asset_operations.router,
+    prefix="",
+    tags=["Asset Operations"]
+)
+
 api_router.include_router(
     assets.router,
     prefix="/assets",
@@ -36,10 +43,4 @@ api_router.include_router(
     reports.router,
     prefix="/reports",
     tags=["Reports"]
-)
-
-api_router.include_router(
-    asset_operations.router,
-    prefix="",
-    tags=["Asset Operations"]
 )
