@@ -21,19 +21,6 @@ services:
     networks:
       - assetdna-network
 
-  # Portainer - Web UI for Docker management
-  portainer:
-    image: portainer/portainer-ce:latest
-    container_name: assetdna-portainer
-    restart: unless-stopped
-    ports:
-      - "9000:9000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
-    networks:
-      - assetdna-network
-
   # Main Application
   assetdna:
     build:
@@ -71,4 +58,3 @@ networks:
 
 volumes:
   postgres_data:
-  portainer_data:

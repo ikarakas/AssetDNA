@@ -856,6 +856,12 @@
                 item.style.cursor = 'move'; // Show move cursor
                 item.setAttribute('draggable', 'true'); // Also set as attribute for browser compatibility
                 
+                // Prevent text selection which can interfere with dragging
+                item.style.userSelect = 'none';
+                item.style.webkitUserSelect = 'none';
+                item.style.MozUserSelect = 'none';
+                item.style.msUserSelect = 'none';
+                
                 // Add click handler to the expand/collapse arrow specifically
                 const expandArrow = item.querySelector('.tree-expand');
                 if (expandArrow && hasChildren) {
@@ -984,6 +990,20 @@
                     
                     e.dataTransfer.effectAllowed = 'move';
                     e.dataTransfer.setData('text/plain', JSON.stringify(draggedAssets));
+                    
+                    // Create a custom drag image to ensure it's visible
+                    const dragImage = document.createElement('div');
+                    dragImage.innerHTML = `📦 ${draggedAssets.length} item(s)`;
+                    dragImage.style.position = 'absolute';
+                    dragImage.style.top = '-1000px';
+                    dragImage.style.backgroundColor = 'white';
+                    dragImage.style.padding = '5px';
+                    dragImage.style.border = '1px solid #ccc';
+                    dragImage.style.borderRadius = '3px';
+                    dragImage.style.zIndex = '9999';
+                    document.body.appendChild(dragImage);
+                    e.dataTransfer.setDragImage(dragImage, 10, 10);
+                    setTimeout(() => document.body.removeChild(dragImage), 0);
                     
                     // Add dragging style to all selected items
                     selectedAssets.forEach(id => {
