@@ -92,9 +92,15 @@
         .tree-item:hover { 
             background: #f8f9fa; 
         }
-        .tree-item.selected { 
-            background: #e7f3ff; 
-            font-weight: bold;
+        
+        .tree-item.selected {
+            background-color: #d1ecf1;
+            border-left: 3px solid #17a2b8;
+            font-weight: 500;
+        }
+        
+        .tree-item.selected:hover {
+            background-color: #c1dce4;
         }
         .tree-item.dragging { 
             opacity: 0.5;
@@ -588,6 +594,9 @@
         // Drag and drop state
         let draggedAsset = null;
         let dragOriginalParent = null;
+        let selectedAssets = new Set(); // For multi-select
+        let draggedAssets = []; // Array of assets being dragged
+        let dragOriginalParents = new Map(); // Map of asset IDs to their original parents
         
         // Track expanded/collapsed state
         let expandedNodes = new Set();
@@ -699,6 +708,87 @@
             if (isRoot) {
                 container.innerHTML = '';
                 globalTreeData = nodes; // Store tree data globally
+                
+                // Add root drop zone at the top (initially hidden)
+                const rootDropZone = document.createElement('div');
+                rootDropZone.id = 'root-drop-zone';
+                rootDropZone.className = 'root-drop-zone';
+                rootDropZone.innerHTML = '<i class="bi bi-house-door"></i> Drop here to move to root level';
+                rootDropZone.style.display = 'none';
+                rootDropZone.style.padding = '10px';
+                rootDropZone.style.margin = '5px 0';
+                rootDropZone.style.border = '2px dashed #007bff';
+                rootDropZone.style.borderRadius = '5px';
+                rootDropZone.style.backgroundColor = '#e7f3ff';
+                rootDropZone.style.textAlign = 'center';
+                rootDropZone.style.cursor = 'pointer';
+                
+                // Add drag events to root drop zone
+                rootDropZone.ondragover = (e) => {
+                    e.preventDefault();
+                    rootDropZone.style.backgroundColor = '#cce5ff';
+                    rootDropZone.style.borderColor = '#0056b3';
+                };
+                
+                rootDropZone.ondragleave = (e) => {
+                    rootDropZone.style.backgroundColor = '#e7f3ff';
+                    rootDropZone.style.borderColor = '#007bff';
+                };
+                
+                rootDropZone.ondrop = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    rootDropZone.style.display = 'none';
+                    rootDropZone.style.backgroundColor = '#e7f3ff';
+                    rootDropZone.style.borderColor = '#007bff';
+                    
+                    try {
+                        const draggedData = e.dataTransfer.getData('text/plain');
+                        if (!draggedData) {
+                            console.error('No drag data available');
+                            return;
+                        }
+                        
+                        let draggedAssetsData;
+                        try {
+                            draggedAssetsData = JSON.parse(draggedData);
+                        } catch (parseError) {
+                            console.error('Failed to parse drag data:', draggedData);
+                            // Fallback to using global draggedAssets
+                            draggedAssetsData = draggedAssets;
+                        }
+                        
+                        if (!draggedAssetsData || draggedAssetsData.length === 0) {
+                            console.error('No assets to drop');
+                            return;
+                        }
+                        
+                        // Move to root (parent_id = null)
+                        window.draggedAssetsForOperation = draggedAssetsData;
+                        window.dropTargetAsset = { id: null, name: 'Root' };
+                        
+                        // Show confirmation modal
+                        const modalMessage = document.getElementById('moveCopyMessage');
+                        const assetNames = draggedAssetsData.map(a => a.name).join(', ');
+                        const message = draggedAssetsData.length === 1 
+                            ? `What would you like to do with "${draggedAssetsData[0].name}"?`
+                            : `What would you like to do with ${draggedAssetsData.length} selected assets?`;
+                        
+                        modalMessage.innerHTML = 
+                            `<strong>${message}</strong><br><br>` +
+                            `Selected: ${assetNames}<br>` +
+                            `Destination: <strong>Root Level</strong>`;
+                        
+                        const modal = new bootstrap.Modal(document.getElementById('moveCopyModal'));
+                        modal.show();
+                    } catch (error) {
+                        console.error('Error in root drop zone:', error);
+                        alert('Failed to process drop operation. Please try again.');
+                    }
+                };
+                
+                container.appendChild(rootDropZone);
+                
                 // Initialize expanded nodes on first render only
                 if (expandedNodes.size === 0) {
                     nodes.forEach(node => {
@@ -715,6 +805,10 @@
                 
                 const item = document.createElement('div');
                 item.className = 'tree-item';
+                // Check if this item should be marked as selected
+                if (selectedAssets.has(String(node.id))) {
+                    item.className += ' selected';
+                }
                 item.dataset.assetId = node.id;
                 item.dataset.assetName = node.name;
                 item.dataset.parentId = node.parent_id || '';
@@ -745,10 +839,10 @@
                     html += '<span class="tree-expand"></span>';
                 }
                 
-                // Icon and name (draggable part)
+                // Icon and name
                 html += `<span class="tree-icon">${typeIcon}</span>`;
                 const childrenCount = hasChildren ? ` (${node.children.length})` : '';
-                html += `<span class="asset-name draggable" draggable="true">${node.name}${childrenCount}</span>`;
+                html += `<span class="asset-name">${node.name}${childrenCount}</span>`;
                 
                 // BOM badge
                 if (node.bom_count > 0) {
@@ -756,6 +850,11 @@
                 }
                 
                 item.innerHTML = html;
+                
+                // Set draggable properties AFTER setting innerHTML
+                item.draggable = true; // Make the entire item draggable
+                item.style.cursor = 'move'; // Show move cursor
+                item.setAttribute('draggable', 'true'); // Also set as attribute for browser compatibility
                 
                 // Add click handler to the expand/collapse arrow specifically
                 const expandArrow = item.querySelector('.tree-expand');
@@ -767,11 +866,60 @@
                     };
                 }
                 
-                // Click handler for selection
+                // Click handler for selection with multi-select support
                 item.onclick = (e) => {
                     if (!e.target.classList.contains('tree-expand')) {
                         e.stopPropagation();
-                        selectAsset(node.id);
+                        
+                        const assetId = String(node.id);
+                        
+                        // Multi-select with Ctrl/Cmd key
+                        if (e.ctrlKey || e.metaKey) {
+                            if (selectedAssets.has(assetId)) {
+                                selectedAssets.delete(assetId);
+                                item.classList.remove('selected');
+                            } else {
+                                selectedAssets.add(assetId);
+                                item.classList.add('selected');
+                            }
+                        } else if (e.shiftKey && selectedAssets.size > 0) {
+                            // Shift+click for range selection
+                            // Find all items between last selected and this one
+                            const allItems = document.querySelectorAll('.tree-item');
+                            const lastSelected = Array.from(selectedAssets).pop();
+                            let inRange = false;
+                            
+                            allItems.forEach(treeItem => {
+                                const itemId = treeItem.dataset.assetId;
+                                if (itemId === lastSelected || itemId === assetId) {
+                                    inRange = !inRange;
+                                    selectedAssets.add(itemId);
+                                    treeItem.classList.add('selected');
+                                    if (itemId === lastSelected && itemId === assetId) {
+                                        inRange = false; // Same item clicked
+                                    }
+                                } else if (inRange) {
+                                    selectedAssets.add(itemId);
+                                    treeItem.classList.add('selected');
+                                }
+                            });
+                            selectedAssets.add(assetId);
+                            item.classList.add('selected');
+                        } else {
+                            // Regular click - clear selection and select only this
+                            document.querySelectorAll('.tree-item.selected').forEach(el => {
+                                el.classList.remove('selected');
+                            });
+                            selectedAssets.clear();
+                            selectedAssets.add(assetId);
+                            item.classList.add('selected');
+                            
+                            // Only call selectAsset for single selection (not multi-select)
+                            selectAsset(node.id);
+                        }
+                        
+                        // Update UI to show multi-select count
+                        updateMultiSelectUI();
                     }
                 };
                 
@@ -793,19 +941,82 @@
                     }
                 };
                 
-                // Drag start
+                // Drag start - support multi-select
                 item.ondragstart = (e) => {
+                    console.log('DRAG START TRIGGERED for:', node.name);
+                    const assetId = String(node.id);
+                    
+                    // Show root drop zone when dragging starts
+                    const rootDropZone = document.getElementById('root-drop-zone');
+                    if (rootDropZone) {
+                        rootDropZone.style.display = 'block';
+                        console.log('Root drop zone shown');
+                    }
+                    
+                    // If this item is not in the selection, clear selection and select only this
+                    if (!selectedAssets.has(assetId)) {
+                        document.querySelectorAll('.tree-item.selected').forEach(el => {
+                            el.classList.remove('selected');
+                        });
+                        selectedAssets.clear();
+                        selectedAssets.add(assetId);
+                        item.classList.add('selected');
+                    }
+                    
+                    // Prepare dragged assets
+                    draggedAssets = [];
+                    dragOriginalParents.clear();
+                    
+                    selectedAssets.forEach(id => {
+                        const asset = findAssetById(id, globalTreeData);
+                        if (asset) {
+                            draggedAssets.push(asset);
+                            dragOriginalParents.set(id, asset.parent_id);
+                        }
+                    });
+                    
+                    // Keep backward compatibility
                     draggedAsset = node;
                     dragOriginalParent = node.parent_id;
+                    
+                    console.log('Drag start - draggedAssets:', draggedAssets);
+                    console.log('Setting dataTransfer data...');
+                    
                     e.dataTransfer.effectAllowed = 'move';
-                    item.style.opacity = '0.5';
-                    console.log(`Dragging: ${node.name}`);
+                    e.dataTransfer.setData('text/plain', JSON.stringify(draggedAssets));
+                    
+                    // Add dragging style to all selected items
+                    selectedAssets.forEach(id => {
+                        const el = document.querySelector(`.tree-item[data-asset-id="${id}"]`);
+                        if (el) el.style.opacity = '0.5';
+                    });
+                    
+                    console.log(`Dragging ${draggedAssets.length} asset(s)`);
                 };
                 
                 // Drag end
                 item.ondragend = (e) => {
-                    item.style.opacity = '';
-                    item.style.backgroundColor = '';
+                    // Hide root drop zone when dragging ends
+                    const rootDropZone = document.getElementById('root-drop-zone');
+                    if (rootDropZone) {
+                        rootDropZone.style.display = 'none';
+                        rootDropZone.style.backgroundColor = '#e7f3ff';
+                        rootDropZone.style.borderColor = '#007bff';
+                    }
+                    
+                    // Reset opacity for all selected items
+                    selectedAssets.forEach(id => {
+                        const el = document.querySelector(`.tree-item[data-asset-id="${id}"]`);
+                        if (el) {
+                            el.style.opacity = '';
+                            el.style.backgroundColor = '';
+                        }
+                    });
+                    
+                    draggedAsset = null;
+                    dragOriginalParent = null;
+                    draggedAssets = [];
+                    dragOriginalParents.clear();
                 };
                 
                 // Drag over - allow drop
@@ -820,31 +1031,50 @@
                     item.style.backgroundColor = '';
                 };
                 
-                // Drop handler
+                // Drop handler - support multiple assets
                 item.ondrop = async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     item.style.backgroundColor = '';
                     
-                    if (!draggedAsset || draggedAsset.id === node.id) {
-                        return; // Can't drop on itself
+                    console.log('Drop handler called, draggedAssets:', draggedAssets);
+                    
+                    if (draggedAssets.length === 0) {
+                        console.log('No draggedAssets, checking draggedAsset:', draggedAsset);
+                        // Fallback to single asset for backward compatibility
+                        if (!draggedAsset || draggedAsset.id === node.id) {
+                            console.log('No valid dragged asset or dropping on itself');
+                            return;
+                        }
+                        draggedAssets = [draggedAsset];
                     }
                     
-                    // Check if trying to drop parent on its own child
-                    if (isDescendant(node, draggedAsset)) {
-                        alert("Cannot move or copy a parent asset under its own child!");
-                        return;
+                    // Check if any dragged asset is the drop target or its ancestor
+                    for (let asset of draggedAssets) {
+                        if (asset.id === node.id) {
+                            alert("Cannot drop an asset on itself!");
+                            return;
+                        }
+                        if (isDescendant(node, asset)) {
+                            alert(`Cannot move "${asset.name}" - it would create a circular reference!`);
+                            return;
+                        }
                     }
                     
-                    // Store the drop target for move/copy operations
+                    // Store the drop target and dragged assets for move/copy operations
                     window.dropTargetAsset = node;
-                    window.draggedAssetForOperation = draggedAsset;
+                    window.draggedAssetsForOperation = draggedAssets;
+                    window.draggedAssetForOperation = draggedAssets[0]; // Keep for compatibility
                     
                     // Show move/copy dialog
-                    const message = `What would you like to do with "${draggedAsset.name}"?`;
+                    const assetNames = draggedAssets.map(a => a.name).join(', ');
+                    const message = draggedAssets.length === 1 
+                        ? `What would you like to do with "${draggedAssets[0].name}"?`
+                        : `What would you like to do with ${draggedAssets.length} selected assets?`;
+                    
                     document.getElementById('moveCopyMessage').innerHTML = 
                         `<strong>${message}</strong><br><br>` +
-                        `Source: ${draggedAsset.name}<br>` +
+                        `Selected: ${assetNames}<br>` +
                         `Destination: Under "${node.name}"`;
                     
                     const modal = new bootstrap.Modal(document.getElementById('moveCopyModal'));
@@ -906,6 +1136,29 @@
             }
         }
         
+        // Function to update UI for multi-select
+        function updateMultiSelectUI() {
+            const count = selectedAssets.size;
+            if (count > 1) {
+                // You could add a badge or status indicator to show selection count
+                console.log(`${count} assets selected`);
+            }
+        }
+        
+        // Helper function to find an asset by ID in the tree
+        function findAssetById(assetId, nodes) {
+            for (let node of nodes) {
+                if (String(node.id) === String(assetId)) {
+                    return node;
+                }
+                if (node.children) {
+                    const found = findAssetById(assetId, node.children);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        
         // Check if potentialChild is a descendant of potentialParent
         function isDescendant(potentialChild, potentialParent) {
             if (!potentialParent.children) return false;
@@ -927,74 +1180,160 @@
                 return;
             }
             
-            try {
-                const response = await fetch(`${API_BASE}/assets/${window.draggedAssetForOperation.id}/move`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        new_parent_id: window.dropTargetAsset.id
-                    })
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log('Asset moved successfully:', result.message);
-                    // Load tree which will also update table
-                    await loadAssetTree();
-                } else {
-                    const error = await response.text();
-                    alert(`Failed to move asset: ${error}`);
+            const assetsToMove = window.draggedAssetsForOperation || [window.draggedAssetForOperation];
+            const targetAsset = window.dropTargetAsset;
+            
+            let successCount = 0;
+            let failedAssets = [];
+            
+            // Identify root assets (those not children of other selected assets)
+            const rootAssetsToMove = assetsToMove.filter(asset => {
+                // Check if this asset's parent is in the selection
+                const parentInSelection = assetsToMove.some(other => 
+                    other.id === asset.parent_id
+                );
+                return !parentInSelection;
+            });
+            
+            // Only move the root assets - their children will move with them automatically
+            for (const asset of rootAssetsToMove) {
+                try {
+                    const response = await fetch(`${API_BASE}/assets/${asset.id}/move`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            new_parent_id: targetAsset.id
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        const error = await response.text();
+                        failedAssets.push(`${asset.name}: ${error}`);
+                    }
+                } catch (error) {
+                    failedAssets.push(`${asset.name}: ${error}`);
                 }
-            } catch (error) {
-                alert(`Error moving asset: ${error}`);
             }
             
-            // Clear the stored references
+            // Show results
+            const totalSelected = assetsToMove.length;
+            const rootCount = rootAssetsToMove.length;
+            const childrenCount = totalSelected - rootCount;
+            
+            if (successCount === rootCount && failedAssets.length === 0) {
+                let message = `Successfully moved ${rootCount} asset(s)`;
+                if (childrenCount > 0) {
+                    message += ` with ${childrenCount} child asset(s)`;
+                }
+                console.log(message);
+            } else if (successCount > 0) {
+                alert(`Moved ${successCount} of ${rootCount} root asset(s). Failed: ${failedAssets.join(', ')}`);
+            } else {
+                alert(`Failed to move assets: ${failedAssets.join(', ')}`);
+            }
+            
+            // Clear selection and references
+            selectedAssets.clear();
+            document.querySelectorAll('.tree-item.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
             window.draggedAssetForOperation = null;
+            window.draggedAssetsForOperation = null;
             window.dropTargetAsset = null;
+            
+            // Refresh the tree
+            await loadAssetTree();
         }
         
-        // Perform asset copy operation (deep copy with children)
+        // Perform asset copy operation - support multiple assets with hierarchy
         async function performAssetCopy() {
             const modal = bootstrap.Modal.getInstance(document.getElementById('moveCopyModal'));
             modal.hide();
             
-            if (!window.draggedAssetForOperation || !window.dropTargetAsset) {
+            const assetsToCopy = window.draggedAssetsForOperation || [window.draggedAssetForOperation];
+            const targetAsset = window.dropTargetAsset;
+            
+            if (!assetsToCopy || assetsToCopy.length === 0 || !targetAsset) {
                 alert('Error: Missing asset information for copy operation');
                 return;
             }
             
-            try {
-                const response = await fetch(`${API_BASE}/assets/${window.draggedAssetForOperation.id}/copy`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        new_parent_id: window.dropTargetAsset.id
-                    })
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log('Asset copied successfully:', result.message);
-                    // Load tree which will also update table
-                    await loadAssetTree();
-                    // Select the newly copied asset
-                    selectAsset(result.id);
-                } else {
-                    const error = await response.text();
-                    alert(`Failed to copy asset: ${error}`);
+            let successCount = 0;
+            let failedAssets = [];
+            let lastCopiedId = null;
+            
+            // Identify root assets (those not children of other selected assets)
+            const rootAssetsToCopy = assetsToCopy.filter(asset => {
+                // Check if this asset's parent is in the selection
+                const parentInSelection = assetsToCopy.some(other => 
+                    other.id === asset.parent_id
+                );
+                return !parentInSelection;
+            });
+            
+            // Only copy the root assets - their children will be copied with them automatically
+            for (const asset of rootAssetsToCopy) {
+                try {
+                    const response = await fetch(`${API_BASE}/assets/${asset.id}/copy`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            new_parent_id: targetAsset.id
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        successCount++;
+                        lastCopiedId = result.id;
+                    } else {
+                        const error = await response.text();
+                        failedAssets.push(`${asset.name}: ${error}`);
+                    }
+                } catch (error) {
+                    failedAssets.push(`${asset.name}: ${error}`);
                 }
-            } catch (error) {
-                alert(`Error copying asset: ${error}`);
             }
             
-            // Clear the stored references
+            // Show results
+            const totalSelected = assetsToCopy.length;
+            const rootCount = rootAssetsToCopy.length;
+            const childrenCount = totalSelected - rootCount;
+            
+            if (successCount === rootCount && failedAssets.length === 0) {
+                let message = `Successfully copied ${rootCount} asset(s)`;
+                if (childrenCount > 0) {
+                    message += ` with ${childrenCount} child asset(s)`;
+                }
+                console.log(message);
+                
+                // Select the last copied asset if single copy
+                if (lastCopiedId && rootCount === 1) {
+                    selectAsset(lastCopiedId);
+                }
+            } else if (successCount > 0) {
+                alert(`Copied ${successCount} of ${rootCount} root asset(s). Failed: ${failedAssets.join(', ')}`);
+            } else {
+                alert(`Failed to copy assets: ${failedAssets.join(', ')}`);
+            }
+            
+            // Clear selection and references
+            selectedAssets.clear();
+            document.querySelectorAll('.tree-item.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
             window.draggedAssetForOperation = null;
+            window.draggedAssetsForOperation = null;
             window.dropTargetAsset = null;
+            
+            // Refresh the tree
+            await loadAssetTree();
         }
         
         // Legacy move function (kept for backward compatibility if needed)
@@ -1427,29 +1766,32 @@
         function selectAsset(assetId) {
             selectedAssetId = assetId;
             
-            // Update tree highlighting
-            document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
-            
-            // Find and highlight the tree item
-            const treeItems = document.querySelectorAll('.tree-item');
-            treeItems.forEach(item => {
-                if (item.dataset.assetId === assetId) {
-                    item.classList.add('selected');
-                    
-                    // Ensure parent nodes are expanded to show this item
-                    let parent = item.parentElement;
-                    while (parent) {
-                        if (parent.classList.contains('tree-children')) {
-                            const parentId = parent.dataset.parentId;
-                            if (parentId) {
-                                expandedNodes.add(String(parentId));
-                                parent.style.display = 'block';
+            // Don't clear multi-select if we have multiple items selected
+            if (selectedAssets.size <= 1) {
+                // Update tree highlighting only for single selection
+                document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
+                
+                // Find and highlight the tree item
+                const treeItems = document.querySelectorAll('.tree-item');
+                treeItems.forEach(item => {
+                    if (item.dataset.assetId === assetId) {
+                        item.classList.add('selected');
+                        
+                        // Ensure parent nodes are expanded to show this item
+                        let parent = item.parentElement;
+                        while (parent) {
+                            if (parent.classList.contains('tree-children')) {
+                                const parentId = parent.dataset.parentId;
+                                if (parentId) {
+                                    expandedNodes.add(String(parentId));
+                                    parent.style.display = 'block';
+                                }
                             }
+                            parent = parent.parentElement;
                         }
-                        parent = parent.parentElement;
                     }
-                }
-            });
+                });
+            }  // Close the if statement for selectedAssets.size <= 1
             
             // Find the asset data - first try table rows, then tree data
             let foundAsset = null;
@@ -1557,11 +1899,19 @@
                     // Use setTimeout to ensure expansion is complete before scrolling
                     setTimeout(() => {
                         try {
-                            if (targetRow.scrollTo) {
-                                targetRow.scrollTo();
+                            // Check if the row is visible in the current table view
+                            if (targetRow && targetRow.scrollTo && typeof targetRow.scrollTo === 'function') {
+                                // Check if row is in the DOM before scrolling
+                                const rowElement = targetRow.getElement();
+                                if (rowElement && rowElement.offsetParent !== null) {
+                                    targetRow.scrollTo();
+                                }
                             }
                         } catch (e) {
-                            console.log('Could not scroll to row:', e);
+                            // Silently ignore scroll errors for non-visible rows
+                            if (!e.message || !e.message.includes('Row not visible')) {
+                                console.log('Could not scroll to row:', e);
+                            }
                         }
                     }, 100);
                 } else {
@@ -1593,11 +1943,19 @@
                                 }
                                 setTimeout(() => {
                                     try {
-                                        if (retryRow.scrollTo) {
-                                            retryRow.scrollTo();
+                                        // Check if the row is visible in the current table view
+                                        if (retryRow && retryRow.scrollTo && typeof retryRow.scrollTo === 'function') {
+                                            // Check if row is in the DOM before scrolling
+                                            const rowElement = retryRow.getElement();
+                                            if (rowElement && rowElement.offsetParent !== null) {
+                                                retryRow.scrollTo();
+                                            }
                                         }
                                     } catch (e) {
-                                        console.log('Could not scroll to row:', e);
+                                        // Silently ignore scroll errors for non-visible rows
+                                        if (!e.message || !e.message.includes('Row not visible')) {
+                                            console.log('Could not scroll to row:', e);
+                                        }
                                     }
                                 }, 100);
                             } else {
