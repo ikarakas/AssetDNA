@@ -674,6 +674,19 @@
                             modal.hide();
                             // Don't refresh on Escape - user is canceling
                         }
+                    } else if (e.key === 'Enter') {
+                        // Don't submit if user is in a textarea
+                        const activeElement = document.activeElement;
+                        const isTextarea = activeElement && activeElement.tagName === 'TEXTAREA';
+                        
+                        if (!isTextarea) {
+                            e.preventDefault(); // Prevent default Enter behavior
+                            // Click the Save Changes button
+                            const saveButton = this.querySelector('button[type="submit"]');
+                            if (saveButton) {
+                                saveButton.click();
+                            }
+                        }
                     }
                 });
                 
@@ -1657,14 +1670,14 @@
                 dataTreeExpandElement: '<span style="display: inline-block; width: 16px; height: 16px; line-height: 14px; text-align: center; cursor: pointer; color: #666; font-size: 12px; margin-right: 3px;">▶</span>',
                 dataTreeCollapseElement: '<span style="display: inline-block; width: 16px; height: 16px; line-height: 14px; text-align: center; cursor: pointer; color: #666; font-size: 12px; margin-right: 3px;">▼</span>',
                 columns: [
-                    {title: "", width: 80, hozAlign: "center", formatter: function(cell) {
+                    {title: "", width: 80, hozAlign: "center", headerSort: false, formatter: function(cell) {
                         const id = cell.getRow().getData().id;
                         if (id) {
                             return `<button class="btn btn-sm btn-primary" onclick="editAsset('${id}')">Edit</button>`;
                         }
                         return '';
                     }},
-                    {title: "Name", field: "name", responsive: 0, width: 400,
+                    {title: "Name", field: "name", responsive: 0, width: 400, headerSort: false,
                      formatter: function(cell, formatterParams, onRendered) {
                          const value = cell.getValue();
                          const data = cell.getRow().getData();
@@ -1693,15 +1706,14 @@
                          return `<span style="margin-right: 5px; font-size: 14px;">${typeIcon}</span><span style="font-size: 13px; font-weight: ${fontWeight}; color: #2c3e50;">${displayName}</span>`;
                      }
                     },
-                    {title: "Type", field: "asset_type", width: 200,
+                    {title: "Type", field: "asset_type", width: 200, headerSort: false,
                      formatter: function(cell) {
                          const type = cell.getValue();
                          return type ? type.name : '';
                      }
                     },
-                    {title: "Parent", field: "parent_name", width: 200},
-                    {title: "Description", field: "description"},
-                    {title: "Status", field: "status", width: 120,
+                    {title: "Description", field: "description", headerSort: false},
+                    {title: "Status", field: "status", width: 120, headerSort: false,
                      formatter: function(cell) {
                          const status = cell.getValue();
                          let color = 'secondary';
@@ -1710,9 +1722,9 @@
                          else if (status === 'deprecated') color = 'danger';
                          return `<span class="badge bg-${color}">${status}</span>`;
                      }},
-                    {title: "Version", field: "version", width: 100},
-                    {title: "External ID", field: "external_id", width: 150},
-                    {title: "Metadata", field: "properties", width: 150,
+                    {title: "Version", field: "version", width: 100, headerSort: false},
+                    {title: "External ID", field: "external_id", width: 150, headerSort: false},
+                    {title: "Metadata", field: "properties", width: 150, headerSort: false,
                      formatter: function(cell) {
                          const props = cell.getValue();
                          if (props && Object.keys(props).length > 0) {
@@ -1729,7 +1741,7 @@
                          }
                          return '<span class="text-muted">-</span>';
                      }},
-                    {title: "URN", field: "urn", responsive: 0}
+                    {title: "URN", field: "urn", responsive: 0, headerSort: false}
                 ],
             });
 
