@@ -7,7 +7,52 @@
     <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Professional Enterprise Typography */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-weight: 400;
+            font-size: 14px;
+            letter-spacing: -0.011em;
+            color: #2c3e50;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        h1, h2, h3, h4, h5, h6, .card-header {
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: #1a202c;
+        }
+        
+        .btn {
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            font-size: 13px;
+            letter-spacing: 0.01em;
+            text-transform: none;
+        }
+        
+        .badge {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 11px;
+            letter-spacing: 0.05em;
+        }
+        
+        .tabulator {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+        }
+        
+        .form-control, .form-select {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+        }
         .navbar-brand { font-weight: bold; }
         .main-container { margin-top: 20px; }
         .asset-tree { 
@@ -71,23 +116,37 @@
         .tabulator-tree-branch {
             border-left: 2px dotted #999;
         }
+        /* Reduce row height and indentation */
+        .tabulator-row {
+            min-height: 32px !important;
+            height: auto !important;
+        }
+        .tabulator-cell {
+            padding: 4px 6px !important;
+            line-height: 1.3 !important;
+        }
         .tabulator-row.tabulator-tree-level-1 .tabulator-cell[tabulator-field="name"] {
-            padding-left: 30px !important;
+            padding-left: 20px !important;
         }
         .tabulator-row.tabulator-tree-level-2 .tabulator-cell[tabulator-field="name"] {
-            padding-left: 55px !important;
+            padding-left: 35px !important;
         }
         .tabulator-row.tabulator-tree-level-3 .tabulator-cell[tabulator-field="name"] {
-            padding-left: 80px !important;
+            padding-left: 50px !important;
         }
         .tree-item { 
             cursor: grab; 
-            padding: 5px;
+            padding: 3px 6px;
             user-select: none;
-            border-radius: 3px;
+            border-radius: 2px;
             transition: all 0.2s;
             display: flex;
             align-items: center;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 400;
+            line-height: 1.3;
+            color: #374151;
         }
         .tree-item:hover { 
             background: #f8f9fa; 
@@ -181,14 +240,14 @@
         }
         .tree-expand {
             cursor: pointer;
-            margin-right: 5px;
-            font-size: 12px;
-            width: 15px;
+            margin-right: 3px;
+            font-size: 10px;
+            width: 12px;
             display: inline-block;
         }
         .tree-icon {
-            margin-right: 5px;
-            font-size: 16px;
+            margin-right: 4px;
+            font-size: 14px;
         }
         .asset-name {
             flex: 1;
@@ -338,11 +397,14 @@
                             <button class="btn btn-sm btn-outline-secondary" onclick="refreshTree()">
                                 <i class="bi bi-arrow-clockwise"></i> Refresh
                             </button>
+                            <span id="selection-count" class="ms-2 badge bg-info" style="display: none;">
+                                <i class="bi bi-check2-square"></i> <span id="selection-count-text">0</span> selected
+                            </span>
                         </div>
                         <div class="mb-2">
                             <small class="text-muted">
                                 <i class="bi bi-info-circle"></i> 
-                                <strong>Drag & Drop:</strong> Click and drag any asset to move or copy it to a new location
+                                <strong>Drag & Drop:</strong> Click and drag assets to move/copy. Use Ctrl/Cmd+Click for multi-select
                             </small>
                         </div>
                         <div id="asset-tree" class="asset-tree"></div>
@@ -806,40 +868,75 @@
             
             // Store the element and data
             draggedElement = e.currentTarget;
-            draggedAssetData = {
-                id: draggedElement.dataset.assetId,
-                name: draggedElement.dataset.assetName,
-                parent_id: draggedElement.dataset.parentId || null
-            };
+            const currentAssetId = draggedElement.dataset.assetId;
+            
+            // Check if this item is part of a multi-selection
+            let assetsToMove = [];
+            if (selectedAssets.size > 1 && selectedAssets.has(currentAssetId)) {
+                // Multi-select drag - drag all selected items
+                selectedAssets.forEach(assetId => {
+                    const item = document.querySelector(`.tree-item[data-asset-id="${assetId}"]`);
+                    if (item) {
+                        assetsToMove.push({
+                            id: item.dataset.assetId,
+                            name: item.dataset.assetName,
+                            parent_id: item.dataset.parentId || null
+                        });
+                    }
+                });
+                console.log(`Dragging ${assetsToMove.length} selected items`);
+            } else {
+                // Single item drag
+                assetsToMove = [{
+                    id: draggedElement.dataset.assetId,
+                    name: draggedElement.dataset.assetName,
+                    parent_id: draggedElement.dataset.parentId || null
+                }];
+            }
+            
+            draggedAssetData = assetsToMove[0]; // Keep first item for compatibility
             
             // Set data transfer
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', JSON.stringify(draggedAssetData));
+            e.dataTransfer.setData('text/plain', JSON.stringify(assetsToMove));
             
             // Set global variables for compatibility
             window.draggedAsset = draggedAssetData;
-            window.draggedAssets = [draggedAssetData];
+            window.draggedAssets = assetsToMove;
             
             // DO NOT modify the DOM during dragstart - schedule it for next tick
             requestAnimationFrame(() => {
-                if (draggedElement) {
+                // Add dragging class to all selected items if multi-select
+                if (selectedAssets.size > 1 && selectedAssets.has(currentAssetId)) {
+                    selectedAssets.forEach(assetId => {
+                        const item = document.querySelector(`.tree-item[data-asset-id="${assetId}"]`);
+                        if (item) {
+                            item.classList.add('dragging');
+                        }
+                    });
+                } else if (draggedElement) {
                     draggedElement.classList.add('dragging');
                 }
+                
                 const rootDropZone = document.getElementById('root-drop-zone');
                 if (rootDropZone) {
                     rootDropZone.style.display = 'block';
                 }
+                
+                // Update UI to show selection count during drag
+                updateMultiSelectUI();
             });
             
-            console.log('Drag started:', draggedAssetData.name);
+            const names = assetsToMove.map(a => a.name).join(', ');
+            console.log('Drag started:', names);
         }
         
         function handleDragEnd(e) {
-            console.log('Drag ended', e);
-            // Clean up visual feedback
-            if (draggedElement) {
-                draggedElement.classList.remove('dragging');
-            }
+            console.log('Drag ended');
+            // Clean up visual feedback - remove dragging class from all items
+            document.querySelectorAll('.tree-item.dragging').forEach(item => {
+                item.classList.remove('dragging');
+            });
             
             // Hide root drop zone
             const rootDropZone = document.getElementById('root-drop-zone');
@@ -856,6 +953,10 @@
             // Reset drag state
             draggedElement = null;
             draggedAssetData = null;
+            window.draggedAssets = null;
+            
+            // Hide selection count badge
+            updateMultiSelectUI();
         }
         
         function handleDragOver(e) {
@@ -936,28 +1037,41 @@
         }
         
         function processAssetDrop(dropTarget, isRoot) {
-            if (!draggedAssetData) {
+            // Use the global draggedAssets array if available (for multi-select)
+            const assetsToProcess = window.draggedAssets || (draggedAssetData ? [draggedAssetData] : null);
+            
+            if (!assetsToProcess || assetsToProcess.length === 0) {
                 console.error('No dragged asset data available');
                 return;
             }
             
             // Set global variables for the modal
-            window.draggedAssets = [draggedAssetData];
-            window.draggedAsset = draggedAssetData;
-            window.draggedAssetForOperation = draggedAssetData; // singular for compatibility
-            window.draggedAssetsForOperation = [draggedAssetData]; // plural for multi-select
+            window.draggedAsset = assetsToProcess[0]; // Keep first for compatibility
+            window.draggedAssetForOperation = assetsToProcess[0]; // singular for compatibility
+            window.draggedAssetsForOperation = assetsToProcess; // plural for multi-select
             window.dropTargetAsset = isRoot ? { id: null, name: 'Root' } : {
                 id: dropTarget.dataset.assetId,
                 name: dropTarget.dataset.assetName
             };
             
-            // Show move/copy modal
-            const message = `What would you like to do with "${draggedAssetData.name}"?`;
+            // Show move/copy modal with appropriate message
+            let message, selectedText;
+            if (assetsToProcess.length === 1) {
+                message = `What would you like to do with "${assetsToProcess[0].name}"?`;
+                selectedText = assetsToProcess[0].name;
+            } else {
+                message = `What would you like to do with ${assetsToProcess.length} selected items?`;
+                selectedText = assetsToProcess.map(a => a.name).join(', ');
+                if (selectedText.length > 100) {
+                    selectedText = `${assetsToProcess.length} items`;
+                }
+            }
+            
             const destination = isRoot ? 'Root Level' : `Under "${dropTarget.dataset.assetName}"`;
             
             document.getElementById('moveCopyMessage').innerHTML = 
                 `<strong>${message}</strong><br><br>` +
-                `Selected: ${draggedAssetData.name}<br>` +
+                `Selected: ${selectedText}<br>` +
                 `Destination: <strong>${destination}</strong>`;
             
             const modal = new bootstrap.Modal(document.getElementById('moveCopyModal'));
@@ -1049,7 +1163,7 @@
             
             nodes.forEach(node => {
                 const itemWrapper = document.createElement('div');
-                itemWrapper.style.paddingLeft = `${level * 20}px`;
+                itemWrapper.style.paddingLeft = `${level * 15}px`;
                 
                 const item = document.createElement('div');
                 item.className = 'tree-item';
@@ -1265,9 +1379,15 @@
         // Function to update UI for multi-select
         function updateMultiSelectUI() {
             const count = selectedAssets.size;
-            if (count > 1) {
-                // You could add a badge or status indicator to show selection count
-                console.log(`${count} assets selected`);
+            const badge = document.getElementById('selection-count');
+            const text = document.getElementById('selection-count-text');
+            
+            // Only show the badge during drag operations
+            if (draggedElement && count > 1) {
+                badge.style.display = 'inline-block';
+                text.textContent = count;
+            } else {
+                badge.style.display = 'none';
             }
         }
         
@@ -1531,11 +1651,11 @@
                 dataTree: true,
                 dataTreeStartExpanded: true,
                 dataTreeChildField: "_children",
-                dataTreeChildIndent: 30,
+                dataTreeChildIndent: 20,
                 dataTreeElementColumn: "name",
-                dataTreeBranchElement: '<span style="display: inline-block; width: 24px; text-align: center; color: #666;">├─</span>',
-                dataTreeExpandElement: '<button class="btn btn-sm btn-outline-secondary" style="width: 24px; height: 24px; padding: 0; line-height: 1; margin-right: 5px;">+</button>',
-                dataTreeCollapseElement: '<button class="btn btn-sm btn-outline-secondary" style="width: 24px; height: 24px; padding: 0; line-height: 1; margin-right: 5px;">−</button>',
+                dataTreeBranchElement: '<span style="display: inline-block; width: 15px; text-align: center; color: #999; font-size: 12px;">└</span>',
+                dataTreeExpandElement: '<span style="display: inline-block; width: 16px; height: 16px; line-height: 14px; text-align: center; cursor: pointer; color: #666; font-size: 12px; margin-right: 3px;">▶</span>',
+                dataTreeCollapseElement: '<span style="display: inline-block; width: 16px; height: 16px; line-height: 14px; text-align: center; cursor: pointer; color: #666; font-size: 12px; margin-right: 3px;">▼</span>',
                 columns: [
                     {title: "", width: 80, hozAlign: "center", formatter: function(cell) {
                         const id = cell.getRow().getData().id;
@@ -1564,11 +1684,13 @@
                          
                          // Add children count for non-leaf nodes
                          let displayName = value;
+                         let fontWeight = 'normal';
                          if (data._children && data._children.length > 0) {
                              displayName = `${value} (${data._children.length})`;
+                             fontWeight = '600'; // Bold for parent nodes
                          }
                          
-                         return `<span style="margin-right: 5px; font-size: 16px;">${typeIcon}</span><strong style="font-size: 14px;">${displayName}</strong>`;
+                         return `<span style="margin-right: 5px; font-size: 14px;">${typeIcon}</span><span style="font-size: 13px; font-weight: ${fontWeight}; color: #2c3e50;">${displayName}</span>`;
                      }
                     },
                     {title: "Type", field: "asset_type", width: 200,
