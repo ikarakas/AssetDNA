@@ -503,16 +503,17 @@
         
         // Initialize on load
         document.addEventListener('DOMContentLoaded', async () => {
-            // Add global dragover handler to allow drops anywhere
-            document.addEventListener('dragover', (e) => {
+            // Prevent default drag behavior on the document
+            document.body.ondragover = (e) => {
                 e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
                 return false;
-            });
+            };
             
-            document.addEventListener('drop', (e) => {
+            document.body.ondrop = (e) => {
                 e.preventDefault();
                 return false;
-            });
+            };
             
             try {
                 await loadAssetTypes();
@@ -735,27 +736,20 @@
                 rootDropZone.style.cursor = 'pointer';
                 
                 // Add drag events to root drop zone
-                rootDropZone.addEventListener('dragenter', (e) => {
+                rootDropZone.ondragover = (e) => {
                     e.preventDefault();
-                    console.log('Root drop zone - dragenter');
-                }, false);
-                
-                rootDropZone.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
                     e.dataTransfer.dropEffect = 'move';
                     rootDropZone.style.backgroundColor = '#cce5ff';
                     rootDropZone.style.borderColor = '#0056b3';
-                }, false);
+                    return false;
+                };
                 
-                rootDropZone.addEventListener('dragleave', (e) => {
-                    if (e.target === rootDropZone) {
-                        rootDropZone.style.backgroundColor = '#e7f3ff';
-                        rootDropZone.style.borderColor = '#007bff';
-                    }
-                }, false);
+                rootDropZone.ondragleave = (e) => {
+                    rootDropZone.style.backgroundColor = '#e7f3ff';
+                    rootDropZone.style.borderColor = '#007bff';
+                };
                 
-                rootDropZone.addEventListener('drop', async (e) => {
+                rootDropZone.ondrop = async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     rootDropZone.style.display = 'none';
@@ -806,7 +800,8 @@
                         console.error('Error in root drop zone:', error);
                         alert('Failed to process drop operation. Please try again.');
                     }
-                }, false);
+                    return false;
+                };
                 
                 container.appendChild(rootDropZone);
                 
@@ -968,16 +963,8 @@
                     }
                 };
                 
-                // Add mousedown handler to debug drag issues
-                item.addEventListener('mousedown', (e) => {
-                    console.log('MOUSEDOWN on:', node.name);
-                    console.log('Button:', e.button);
-                    console.log('Target tagName:', e.target.tagName);
-                    console.log('Target classList:', e.target.classList.toString());
-                });
-                
                 // Drag start - support multi-select
-                item.addEventListener('dragstart', (e) => {
+                item.ondragstart = (e) => {
                     console.log('DRAG START TRIGGERED for:', node.name);
                     console.log('Event:', e);
                     console.log('Target:', e.target);
@@ -1041,10 +1028,10 @@
                     });
                     
                     console.log(`Dragging ${draggedAssets.length} asset(s)`);
-                }, false);
+                };
                 
                 // Drag end
-                item.addEventListener('dragend', (e) => {
+                item.ondragend = (e) => {
                     console.log('DRAG END');
                     
                     // Hide root drop zone when dragging ends
@@ -1071,16 +1058,10 @@
                     dragOriginalParents.clear();
                     window.draggedAsset = null;
                     window.draggedAssets = null;
-                }, false);
-                
-                // Drag enter
-                item.addEventListener('dragenter', (e) => {
-                    e.preventDefault();
-                    console.log('Drag enter:', node.name);
-                }, false);
+                };
                 
                 // Drag over - allow drop
-                item.addEventListener('dragover', (e) => {
+                item.ondragover = (e) => {
                     // Must prevent default to allow drop
                     e.preventDefault();
                     e.stopPropagation();
@@ -1094,18 +1075,16 @@
                     
                     e.dataTransfer.dropEffect = 'move';
                     item.style.backgroundColor = '#e7f3ff';
-                }, false);
+                    return false; // Critical for Chrome
+                };
                 
                 // Drag leave
-                item.addEventListener('dragleave', (e) => {
-                    // Check if we're actually leaving the element
-                    if (e.target === item) {
-                        item.style.backgroundColor = '';
-                    }
-                }, false);
+                item.ondragleave = (e) => {
+                    item.style.backgroundColor = '';
+                };
                 
                 // Drop handler - support multiple assets
-                item.addEventListener('drop', async (e) => {
+                item.ondrop = async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     item.style.backgroundColor = '';
@@ -1164,7 +1143,8 @@
                     
                     const modal = new bootstrap.Modal(document.getElementById('moveCopyModal'));
                     modal.show();
-                }, false);
+                    return false;
+                };
                 
                 itemWrapper.appendChild(item);
                 container.appendChild(itemWrapper);
