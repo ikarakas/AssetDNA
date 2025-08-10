@@ -953,13 +953,21 @@
                     }
                 };
                 
+                // Add mousedown handler to debug drag issues
+                item.addEventListener('mousedown', (e) => {
+                    console.log('MOUSEDOWN on:', node.name);
+                    console.log('Button:', e.button);
+                    console.log('Target tagName:', e.target.tagName);
+                    console.log('Target classList:', e.target.classList.toString());
+                });
+                
                 // Drag start - support multi-select
                 item.addEventListener('dragstart', (e) => {
                     console.log('DRAG START TRIGGERED for:', node.name);
+                    console.log('Event:', e);
+                    console.log('Target:', e.target);
+                    console.log('CurrentTarget:', e.currentTarget);
                     const assetId = String(node.id);
-                    
-                    // CRITICAL: Stop propagation to prevent parent handlers
-                    e.stopPropagation();
                     
                     // Show root drop zone when dragging starts
                     const rootDropZone = document.getElementById('root-drop-zone');
@@ -997,32 +1005,19 @@
                     console.log('Drag start - draggedAssets:', draggedAssets);
                     console.log('Setting dataTransfer data...');
                     
-                    // IMPORTANT: Set drag effect and data
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.dropEffect = 'move';
-                    // Chrome requires setting some data
-                    e.dataTransfer.setData('text/plain', node.id.toString());
-                    
                     // Store in window for reliable access during drop
                     window.draggedAssets = draggedAssets;
                     window.draggedAsset = draggedAsset;
                     
-                    // Create a custom drag image to ensure visual feedback
-                    const dragImage = document.createElement('div');
-                    dragImage.textContent = `Moving ${draggedAssets.length} asset(s)`;
-                    dragImage.style.position = 'absolute';
-                    dragImage.style.top = '-1000px';
-                    dragImage.style.backgroundColor = '#007bff';
-                    dragImage.style.color = 'white';
-                    dragImage.style.padding = '4px 8px';
-                    dragImage.style.borderRadius = '4px';
-                    dragImage.style.fontSize = '12px';
-                    document.body.appendChild(dragImage);
-                    e.dataTransfer.setDragImage(dragImage, 0, 0);
-                    setTimeout(() => dragImage.remove(), 0);
-                    
-                    // Don't use custom drag image for now - let browser handle it
-                    // This might be causing the issue in Chrome
+                    // IMPORTANT: Set drag effect and data
+                    try {
+                        e.dataTransfer.effectAllowed = 'move';
+                        // Chrome requires setting some data - use simple text
+                        e.dataTransfer.setData('text/plain', node.id.toString());
+                        console.log('DataTransfer set successfully');
+                    } catch (err) {
+                        console.error('Error setting dataTransfer:', err);
+                    }
                     
                     // Add dragging style to all selected items
                     selectedAssets.forEach(id => {
