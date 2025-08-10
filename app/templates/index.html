@@ -721,6 +721,16 @@
                 container.innerHTML = '';
                 globalTreeData = nodes; // Store tree data globally
                 
+                // Add dragover handler to container to ensure drops work
+                container.ondragover = (e) => {
+                    e.preventDefault();
+                    return false;
+                };
+                container.ondrop = (e) => {
+                    e.preventDefault();
+                    return false;
+                };
+                
                 // Add root drop zone at the top (initially hidden)
                 const rootDropZone = document.createElement('div');
                 rootDropZone.id = 'root-drop-zone';
@@ -868,9 +878,8 @@
                 item.innerHTML = html;
                 
                 // Set draggable properties AFTER setting innerHTML
-                item.draggable = true; // Make the entire item draggable
-                item.style.cursor = 'move'; // Show move cursor
-                item.setAttribute('draggable', 'true'); // Also set as attribute for browser compatibility
+                item.setAttribute('draggable', 'true');
+                item.style.cursor = 'move';
                 
                 // Prevent text selection
                 item.style.userSelect = 'none';
@@ -890,6 +899,9 @@
                 
                 // Click handler for selection with multi-select support
                 item.onclick = (e) => {
+                    // Don't handle clicks during drag operations
+                    if (e.defaultPrevented) return;
+                    
                     if (!e.target.classList.contains('tree-expand')) {
                         e.stopPropagation();
                         
@@ -966,9 +978,6 @@
                 // Drag start - support multi-select
                 item.ondragstart = (e) => {
                     console.log('DRAG START TRIGGERED for:', node.name);
-                    console.log('Event:', e);
-                    console.log('Target:', e.target);
-                    console.log('CurrentTarget:', e.currentTarget);
                     const assetId = String(node.id);
                     
                     // Show root drop zone when dragging starts
@@ -1012,14 +1021,8 @@
                     window.draggedAsset = draggedAsset;
                     
                     // IMPORTANT: Set drag effect and data
-                    try {
-                        e.dataTransfer.effectAllowed = 'move';
-                        // Chrome requires setting some data - use simple text
-                        e.dataTransfer.setData('text/plain', node.id.toString());
-                        console.log('DataTransfer set successfully');
-                    } catch (err) {
-                        console.error('Error setting dataTransfer:', err);
-                    }
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', node.id.toString());
                     
                     // Add dragging style to all selected items
                     selectedAssets.forEach(id => {
@@ -1060,22 +1063,19 @@
                     window.draggedAssets = null;
                 };
                 
+                // Drag enter
+                item.ondragenter = (e) => {
+                    if (e.preventDefault) e.preventDefault();
+                    console.log('Drag enter:', node.name);
+                    return false;
+                };
+                
                 // Drag over - allow drop
                 item.ondragover = (e) => {
-                    // Must prevent default to allow drop
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    // Only log occasionally to avoid spam
-                    if (!item.dataset.dragOverLogged) {
-                        console.log('Drag over:', node.name);
-                        item.dataset.dragOverLogged = 'true';
-                        setTimeout(() => delete item.dataset.dragOverLogged, 100);
-                    }
-                    
+                    if (e.preventDefault) e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
                     item.style.backgroundColor = '#e7f3ff';
-                    return false; // Critical for Chrome
+                    return false;
                 };
                 
                 // Drag leave
