@@ -724,18 +724,27 @@
                 rootDropZone.style.cursor = 'pointer';
                 
                 // Add drag events to root drop zone
-                rootDropZone.ondragover = (e) => {
+                rootDropZone.addEventListener('dragenter', (e) => {
                     e.preventDefault();
+                    console.log('Root drop zone - dragenter');
+                }, false);
+                
+                rootDropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'move';
                     rootDropZone.style.backgroundColor = '#cce5ff';
                     rootDropZone.style.borderColor = '#0056b3';
-                };
+                }, false);
                 
-                rootDropZone.ondragleave = (e) => {
-                    rootDropZone.style.backgroundColor = '#e7f3ff';
-                    rootDropZone.style.borderColor = '#007bff';
-                };
+                rootDropZone.addEventListener('dragleave', (e) => {
+                    if (e.target === rootDropZone) {
+                        rootDropZone.style.backgroundColor = '#e7f3ff';
+                        rootDropZone.style.borderColor = '#007bff';
+                    }
+                }, false);
                 
-                rootDropZone.ondrop = async (e) => {
+                rootDropZone.addEventListener('drop', async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     rootDropZone.style.display = 'none';
@@ -786,7 +795,7 @@
                         console.error('Error in root drop zone:', error);
                         alert('Failed to process drop operation. Please try again.');
                     }
-                };
+                }, false);
                 
                 container.appendChild(rootDropZone);
                 
@@ -856,10 +865,6 @@
                 item.draggable = true; // Make the entire item draggable
                 item.style.cursor = 'move'; // Show move cursor
                 item.setAttribute('draggable', 'true'); // Also set as attribute for browser compatibility
-                
-                // Prevent text selection which can interfere with dragging
-                item.style.userSelect = 'none';
-                item.style.webkitUserSelect = 'none';
                 item.style.MozUserSelect = 'none';
                 item.style.msUserSelect = 'none';
                 
@@ -949,9 +954,12 @@
                 };
                 
                 // Drag start - support multi-select
-                item.ondragstart = (e) => {
+                item.addEventListener('dragstart', (e) => {
                     console.log('DRAG START TRIGGERED for:', node.name);
                     const assetId = String(node.id);
+                    
+                    // CRITICAL: Stop propagation to prevent parent handlers
+                    e.stopPropagation();
                     
                     // Show root drop zone when dragging starts
                     const rootDropZone = document.getElementById('root-drop-zone');
@@ -989,13 +997,29 @@
                     console.log('Drag start - draggedAssets:', draggedAssets);
                     console.log('Setting dataTransfer data...');
                     
+                    // IMPORTANT: Set drag effect and data
                     e.dataTransfer.effectAllowed = 'move';
-                    // Set dummy data to satisfy Chrome's requirements
-                    e.dataTransfer.setData('text/plain', 'moving');
+                    e.dataTransfer.dropEffect = 'move';
+                    // Chrome requires setting some data
+                    e.dataTransfer.setData('text/plain', node.id.toString());
                     
                     // Store in window for reliable access during drop
                     window.draggedAssets = draggedAssets;
                     window.draggedAsset = draggedAsset;
+                    
+                    // Create a custom drag image to ensure visual feedback
+                    const dragImage = document.createElement('div');
+                    dragImage.textContent = `Moving ${draggedAssets.length} asset(s)`;
+                    dragImage.style.position = 'absolute';
+                    dragImage.style.top = '-1000px';
+                    dragImage.style.backgroundColor = '#007bff';
+                    dragImage.style.color = 'white';
+                    dragImage.style.padding = '4px 8px';
+                    dragImage.style.borderRadius = '4px';
+                    dragImage.style.fontSize = '12px';
+                    document.body.appendChild(dragImage);
+                    e.dataTransfer.setDragImage(dragImage, 0, 0);
+                    setTimeout(() => dragImage.remove(), 0);
                     
                     // Don't use custom drag image for now - let browser handle it
                     // This might be causing the issue in Chrome
@@ -1007,10 +1031,10 @@
                     });
                     
                     console.log(`Dragging ${draggedAssets.length} asset(s)`);
-                };
+                }, false);
                 
                 // Drag end
-                item.ondragend = (e) => {
+                item.addEventListener('dragend', (e) => {
                     console.log('DRAG END');
                     
                     // Hide root drop zone when dragging ends
@@ -1037,23 +1061,41 @@
                     dragOriginalParents.clear();
                     window.draggedAsset = null;
                     window.draggedAssets = null;
-                };
+                }, false);
+                
+                // Drag enter
+                item.addEventListener('dragenter', (e) => {
+                    e.preventDefault();
+                    console.log('Drag enter:', node.name);
+                }, false);
                 
                 // Drag over - allow drop
-                item.ondragover = (e) => {
-                    console.log('Drag over:', node.name);
+                item.addEventListener('dragover', (e) => {
+                    // Must prevent default to allow drop
                     e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Only log occasionally to avoid spam
+                    if (!item.dataset.dragOverLogged) {
+                        console.log('Drag over:', node.name);
+                        item.dataset.dragOverLogged = 'true';
+                        setTimeout(() => delete item.dataset.dragOverLogged, 100);
+                    }
+                    
                     e.dataTransfer.dropEffect = 'move';
                     item.style.backgroundColor = '#e7f3ff';
-                };
+                }, false);
                 
                 // Drag leave
-                item.ondragleave = (e) => {
-                    item.style.backgroundColor = '';
-                };
+                item.addEventListener('dragleave', (e) => {
+                    // Check if we're actually leaving the element
+                    if (e.target === item) {
+                        item.style.backgroundColor = '';
+                    }
+                }, false);
                 
                 // Drop handler - support multiple assets
-                item.ondrop = async (e) => {
+                item.addEventListener('drop', async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     item.style.backgroundColor = '';
@@ -1112,7 +1154,7 @@
                     
                     const modal = new bootstrap.Modal(document.getElementById('moveCopyModal'));
                     modal.show();
-                };
+                }, false);
                 
                 itemWrapper.appendChild(item);
                 container.appendChild(itemWrapper);
