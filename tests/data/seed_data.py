@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Seed the AssetDNA database with initial data
+Seed the AssetDNA database with initial data for testing and development
 """
 import asyncio
 import sys
 from pathlib import Path
 
-# Add the app directory to the path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add the app directory to the path (go up two levels from tests/data to reach the root)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.core.database import get_db, engine
 from app.models.asset import Asset, AssetType, AssetTypeEnum

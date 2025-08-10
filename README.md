@@ -33,7 +33,24 @@ AssetDNA is a Bill of Materials (BOM) management system designed to track and an
 
 ### Using Docker (Recommended)
 ```bash
+# Start all services
 docker-compose up -d
+
+# Or use the Makefile for easier management
+make up
+```
+
+**Available Makefile Commands:**
+```bash
+make up          # Start all services
+make down        # Stop all services
+make restart     # Restart all services
+make build       # Build containers
+make logs        # View logs
+make shell       # Open shell in app container
+make migrate     # Run database migrations
+make status      # Show service status
+make help        # Show all available commands
 ```
 
 ### Manual Installation
@@ -49,13 +66,25 @@ pip install -r requirements.txt
 alembic upgrade head
 
 # Run application
-python main.py
+uvicorn main:app --host 0.0.0.0 --port 10001 --reload
 ```
 
 ## API Documentation
 Once running, API documentation is available at:
 - http://localhost:10001/docs (Swagger UI)
 - http://localhost:10001/redoc (ReDoc)
+
+**Quick Start:**
+```bash
+# Start the application
+make up
+
+# View logs
+make logs
+
+# Check service status
+make status
+```
 
 ## Usage
 

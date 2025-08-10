@@ -18,10 +18,6 @@ help: ## Show this help message
 	@echo "Ports:"
 	@echo "  ${YELLOW}10001${NC} - Main Application"
 	@echo "  ${YELLOW}10432${NC} - PostgreSQL"
-	@echo "  ${YELLOW}10379${NC} - Redis"
-	@echo "  ${YELLOW}10050${NC} - pgAdmin"
-	@echo "  ${YELLOW}10080${NC} - Nginx HTTP"
-	@echo "  ${YELLOW}10443${NC} - Nginx HTTPS"
 
 build: ## Build all containers
 	@echo "${YELLOW}Building containers...${NC}"
@@ -34,7 +30,6 @@ up: ## Start all services
 	@echo ""
 	@echo "Access points:"
 	@echo "  Main App:  http://localhost:10001"
-	@echo "  pgAdmin:   http://localhost:10050"
 	@echo "  API Docs:  http://localhost:10001/docs"
 
 down: ## Stop all services
@@ -77,6 +72,10 @@ status: ## Show status of all services
 test: ## Run tests
 	@echo "${YELLOW}Running tests...${NC}"
 	docker-compose exec assetdna pytest
+
+seed: ## Seed database with test data
+	@echo "${YELLOW}Seeding database with test data...${NC}"
+	docker-compose exec assetdna python tests/data/seed_data.py
 
 backup: ## Backup database
 	@echo "${YELLOW}Backing up database...${NC}"
