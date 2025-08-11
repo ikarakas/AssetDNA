@@ -16,7 +16,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="AssetDNA",
         description="BOM Tracking & Historical Analysis System",
-        version="0.1.0",
+        version="0.2.0",
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json" if settings.DEBUG else None,
