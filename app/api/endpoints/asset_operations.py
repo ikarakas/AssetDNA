@@ -30,21 +30,24 @@ router = APIRouter()
 @router.get("/assets/summary")
 async def get_asset_summary(db: AsyncSession = Depends(get_db)):
     """
-    Get summary statistics for all assets grouped by type
+    Get summary statistics for all assets grouped by type, including BOM information
     """
-    from sqlalchemy import func, case
+    from sqlalchemy import func, case, distinct
+    from app.models.bom import BOMHistory
     
-    # Query to get counts by asset type and status
+    # Query to get counts by asset type and status, including BOM counts
     result = await db.execute(
         select(
             AssetType.name.label('type_name'),
-            func.count(Asset.id).label('total'),
+            func.count(distinct(Asset.id)).label('total'),
             func.sum(case((Asset.status == 'active', 1), else_=0)).label('active'),
-            func.sum(case((Asset.status != 'active', 1), else_=0)).label('inactive')
+            func.sum(case((Asset.status != 'active', 1), else_=0)).label('inactive'),
+            func.count(distinct(BOMHistory.asset_id)).label('with_bom')
         )
         .join(Asset, Asset.asset_type_id == AssetType.id)
+        .outerjoin(BOMHistory, BOMHistory.asset_id == Asset.id)
         .group_by(AssetType.name)
-        .order_by(func.count(Asset.id).desc())
+        .order_by(func.count(distinct(Asset.id)).desc())
     )
     
     type_summary = result.all()
@@ -52,27 +55,65 @@ async def get_asset_summary(db: AsyncSession = Depends(get_db)):
     # Get total counts
     total_result = await db.execute(
         select(
-            func.count(Asset.id).label('total'),
+            func.count(distinct(Asset.id)).label('total'),
             func.sum(case((Asset.status == 'active', 1), else_=0)).label('active'),
             func.sum(case((Asset.status != 'active', 1), else_=0)).label('inactive')
-        )
+        ).select_from(Asset)
     )
     
     totals = total_result.first()
+    
+    # Get BOM statistics
+    bom_result = await db.execute(
+        select(
+            func.count(distinct(BOMHistory.id)).label('total_boms'),
+            func.count(distinct(BOMHistory.asset_id)).label('assets_with_bom')
+        ).select_from(BOMHistory)
+    )
+    
+    bom_stats = bom_result.first()
+    
+    # Get BOM count by asset type
+    bom_by_type_result = await db.execute(
+        select(
+            AssetType.name.label('type_name'),
+            func.count(distinct(BOMHistory.id)).label('bom_count'),
+            func.count(distinct(BOMHistory.asset_id)).label('assets_with_bom')
+        )
+        .join(Asset, Asset.asset_type_id == AssetType.id)
+        .join(BOMHistory, BOMHistory.asset_id == Asset.id)
+        .group_by(AssetType.name)
+        .order_by(func.count(distinct(BOMHistory.id)).desc())
+    )
+    
+    bom_by_type = bom_by_type_result.all()
     
     return {
         "total_assets": totals.total or 0,
         "active_assets": totals.active or 0,
         "inactive_assets": totals.inactive or 0,
+        "total_boms": bom_stats.total_boms or 0,
+        "assets_with_bom": bom_stats.assets_with_bom or 0,
+        "assets_without_bom": (totals.total or 0) - (bom_stats.assets_with_bom or 0),
         "by_type": [
             {
                 "type": row.type_name,
                 "total": row.total,
                 "active": row.active or 0,
                 "inactive": row.inactive or 0,
-                "percentage": round((row.total / totals.total * 100), 1) if totals.total > 0 else 0
+                "with_bom": row.with_bom or 0,
+                "percentage": round((row.total / totals.total * 100), 1) if totals.total > 0 else 0,
+                "bom_percentage": round((row.with_bom / row.total * 100), 1) if row.total > 0 else 0
             }
             for row in type_summary
+        ],
+        "bom_by_type": [
+            {
+                "type": row.type_name,
+                "bom_count": row.bom_count,
+                "assets_with_bom": row.assets_with_bom
+            }
+            for row in bom_by_type
         ]
     }
 
